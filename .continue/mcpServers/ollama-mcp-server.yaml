@@ -1,0 +1,7 @@
+name: Ollama MCP Bridge v3
+version: 1.0.0
+schema: v1
+
+mcpServers:
+  - name: Ollama MCP v3
+    url: http://localhost:43145/mcp

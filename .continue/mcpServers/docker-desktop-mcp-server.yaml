@@ -1,0 +1,11 @@
+name: Docker Desktop MCP Gateway (Windows+WSL)
+version: 0.0.3
+schema: v1
+mcpServers:
+  - name: MCP_DOCKER
+    command: powershell.exe
+    args:
+      - docker
+      - mcp
+      - gateway
+      - run

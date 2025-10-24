@@ -1,0 +1,10 @@
+name: fastapi-mcp
+version: 0.0.3
+schema: v1
+mcpServers:
+  - name: fastapi-mcp
+    command: cmd
+    args:
+      - npx
+      - mcp-remote
+      - http://127.0.0.1:8000/mcp
