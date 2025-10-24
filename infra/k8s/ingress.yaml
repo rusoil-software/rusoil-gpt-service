@@ -1,19 +1,19 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: usptu-ingress
+  name: rusoilgpt-ingress
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "20m"
 spec:
   ingressClassName: nginx
   rules:
-    - host: usptu.local
+    - host: rusoilgpt.local
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: usptu-backend-svc
+                name: rusoilgpt-backend-svc
                 port:
                   number: 8000

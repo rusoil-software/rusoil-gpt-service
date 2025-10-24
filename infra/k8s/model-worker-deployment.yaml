@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: usptu-model-worker
+  name: rusoilgpt-model-worker
   labels:
-    app: usptu-model-worker
+    app: rusoilgpt-model-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: usptu-model-worker
+      app: rusoilgpt-model-worker
   template:
     metadata:
       labels:
-        app: usptu-model-worker
+        app: rusoilgpt-model-worker
     spec:
       containers:
         - name: model-worker
@@ -32,10 +32,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: usptu-model-worker-svc
+  name: rusoilgpt-model-worker-svc
 spec:
   selector:
-    app: usptu-model-worker
+    app: rusoilgpt-model-worker
   ports:
     - protocol: TCP
       port: 8100

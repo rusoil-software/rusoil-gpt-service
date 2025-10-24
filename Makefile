@@ -10,10 +10,10 @@ build:
 
 # Run the image (default CMD) in detached mode
 docker-run:
-	docker run -d --name usptu-local -p 8000:8000 rusoil-gpt-service:local || true
+	docker run -d --name rusoilgpt-local -p 8000:8000 rusoil-gpt-service:local || true
 
 docker-stop:
-	docker rm -f usptu-local || true
+	docker rm -f rusoilgpt-local || true
 
 # PowerShell helpers (callable from Git Bash/WSL via winpty or just use scripts/)
 ps-build-and-run:

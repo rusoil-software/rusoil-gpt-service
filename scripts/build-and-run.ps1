@@ -3,7 +3,7 @@
   Build the Docker image and run it locally (PowerShell)
 
 .NOTES
-  Usage: ./scripts/build-and-run.ps1 -Tag usptu-local
+  Usage: ./scripts/build-and-run.ps1 -Tag rusoilgpt-local
 #>
 param(
   [string]$Tag = "rusoil-gpt-service:local",
@@ -14,5 +14,5 @@ Write-Host "Building image $Tag..."
 docker build -t $Tag .
 
 Write-Host "Running container $Tag on port $Port..."
-docker run -d --name usptu-local -p ${Port}:8000 $Tag | Out-Null
-Write-Host "Container started. Use 'docker logs -f usptu-local' to follow logs." 
+docker run -d --name rusoilgpt-local -p ${Port}:8000 $Tag | Out-Null
+Write-Host "Container started. Use 'docker logs -f rusoilgpt-local' to follow logs." 

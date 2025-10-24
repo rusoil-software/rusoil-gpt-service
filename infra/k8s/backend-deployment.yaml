@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: usptu-backend
+  name: rusoilgpt-backend
   labels:
-    app: usptu-backend
+    app: rusoilgpt-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: usptu-backend
+      app: rusoilgpt-backend
   template:
     metadata:
       labels:
-        app: usptu-backend
+        app: rusoilgpt-backend
     spec:
       containers:
         - name: backend
@@ -25,7 +25,7 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: usptu-secrets
+                  name: rusoilgpt-secrets
                   key: DATABASE_URL
           readinessProbe:
             httpGet:
@@ -44,10 +44,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: usptu-backend-svc
+  name: rusoilgpt-backend-svc
 spec:
   selector:
-    app: usptu-backend
+    app: rusoilgpt-backend
   ports:
     - protocol: TCP
       port: 8000

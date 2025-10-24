@@ -1,5 +1,5 @@
 apiVersion: v2
-name: usptu
+name: rusoilgpt
 description: Minimal Helm chart for rusoil-gpt-service
 version: 0.1.0
 appVersion: "0.1.0"

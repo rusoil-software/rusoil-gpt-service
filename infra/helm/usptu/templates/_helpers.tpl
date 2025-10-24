@@ -1,7 +1,7 @@
-{{- define "usptu.name" -}}
+{{- define "rusoilgpt.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "usptu.fullname" -}}
-{{- printf "%s" (include "usptu.name" .) -}}
+{{- define "rusoilgpt.fullname" -}}
+{{- printf "%s" (include "rusoilgpt.name" .) -}}
 {{- end -}}

@@ -11,6 +11,6 @@ service:
 
 ingress:
   enabled: true
-  host: usptu.local
+  host: rusoilgpt.local
 
 resources: {}

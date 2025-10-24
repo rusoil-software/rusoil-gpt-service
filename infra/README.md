@@ -25,7 +25,7 @@ Quick start (k8s, local)
 
 ```powershell
 # apply secrets (replace with secure tooling in prod)
-kubectl create secret generic usptu-secrets --from-literal=DATABASE_URL='postgres://usptu:pass@usptu-postgres-svc:5432/usptu' --from-literal=POSTGRES_USER=usptu --from-literal=POSTGRES_PASSWORD=usptu_pass
+kubectl create secret generic rusoilgpt-secrets --from-literal=DATABASE_URL='postgres://rusoilgpt:pass@rusoilgpt-postgres-svc:5432/rusoilgpt' --from-literal=POSTGRES_USER=rusoilgpt --from-literal=POSTGRES_PASSWORD=rusoilgpt_pass
 
 # apply manifests
 kubectl apply -f infra/k8s/postgres-deployment.yaml

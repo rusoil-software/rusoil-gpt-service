@@ -32,9 +32,9 @@ services:
     image: postgres:15
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-usptu}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-usptu_pass}
-      - POSTGRES_DB=${POSTGRES_DB:-usptu}
+      - POSTGRES_USER=${POSTGRES_USER:-rusoilgpt}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rusoilgpt_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-rusoilgpt}
     volumes:
       - pgdata:/var/lib/postgresql/data
 

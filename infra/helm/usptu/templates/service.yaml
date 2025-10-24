@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "usptu.fullname" . }}-svc
+  name: {{ include "rusoilgpt.fullname" . }}-svc
 spec:
   type: {{ .Values.service.type }}
   selector:
-    app: {{ include "usptu.name" . }}
+    app: {{ include "rusoilgpt.name" . }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.port }}

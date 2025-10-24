@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "usptu.fullname" . }}-ingress
+  name: {{ include "rusoilgpt.fullname" . }}-ingress
 spec:
   rules:
     - host: {{ .Values.ingress.host }}
@@ -12,7 +12,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "usptu.fullname" . }}-svc
+                name: {{ include "rusoilgpt.fullname" . }}-svc
                 port:
                   number: {{ .Values.service.port }}
 {{- end }}

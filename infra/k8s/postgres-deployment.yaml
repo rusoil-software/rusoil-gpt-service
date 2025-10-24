@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: usptu-postgres
+  name: rusoilgpt-postgres
   labels:
-    app: usptu-postgres
+    app: rusoilgpt-postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: usptu-postgres
+      app: rusoilgpt-postgres
   template:
     metadata:
       labels:
-        app: usptu-postgres
+        app: rusoilgpt-postgres
     spec:
       containers:
         - name: postgres
@@ -21,15 +21,15 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: usptu-secrets
+                  name: rusoilgpt-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: usptu-secrets
+                  name: rusoilgpt-secrets
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
-              value: "usptu"
+              value: "rusoilgpt"
           ports:
             - containerPort: 5432
           volumeMounts:
@@ -43,10 +43,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: usptu-postgres-svc
+  name: rusoilgpt-postgres-svc
 spec:
   selector:
-    app: usptu-postgres
+    app: rusoilgpt-postgres
   ports:
     - protocol: TCP
       port: 5432
