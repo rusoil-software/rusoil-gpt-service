@@ -1,0 +1,92 @@
+name: PR Conventions Check
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  enforce-conventions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Check PR body and changed files for conventions and tests
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const body = context.payload.pull_request && context.payload.pull_request.body || '';
+            const requiredCheckbox = 'I read and followed doc/conventions.md';
+
+            if (!body.includes(requiredCheckbox)) {
+              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}'. Please update the PR description.`);
+              return;
+            }
+
+            // List files changed in the PR
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const per_page = 100;
+            let page = 1;
+            let files = [];
+            while (true) {
+              const res = await github.pulls.listFiles({ owner, repo, pull_number: prNumber, per_page, page });
+              if (!res || !res.data) break;
+              files = files.concat(res.data.map(f => ({ filename: f.filename, status: f.status })));
+              if (res.data.length < per_page) break;
+              page += 1;
+            }
+
+            core.info(`Files changed in PR (${files.length}):\n${files.map(f => f.filename).join('\n')}`);
+
+            // Identify code files (likely to require tests)
+            const codeFileRe = /\.(py|ts|tsx|js|jsx)$/i;
+            const testFileRe = /(^|\/)tests?(\/|$)|(^|\/)(__tests__)(\/|$)|\.test\.(js|ts|tsx|py)$|\.spec\.(js|ts|tsx)$/i;
+
+            const changedCodeFiles = files.filter(f => codeFileRe.test(f.filename) && !testFileRe.test(f.filename));
+
+            if (changedCodeFiles.length === 0) {
+              core.info('No code files changed that require unit tests.');
+              return;
+            }
+
+            // Check if any of the changed files include tests
+            const changedTestFiles = files.filter(f => testFileRe.test(f.filename));
+
+            if (changedTestFiles.length === 0) {
+              core.setFailed('This PR modifies code files but does not add or modify unit tests. Please add fast unit tests (happy path + 1 edge case) under a tests/ folder or using *.test.* / *.spec.* patterns.');
+            } else {
+              core.info(`Found test files in PR:\n${changedTestFiles.map(f => f.filename).join('\n')}`);
+            }
+
+      - name: Post or update PR comment with remediation steps (on failure)
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = pr.number;
+
+            // Marker used to identify the bot's comment so it can be updated instead of duplicated
+            const botMarker = '<!-- pr-conventions-check -->';
+
+            const body = `${botMarker}\nThanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:\n\n1) Add the exact checklist line to the PR description:\n   - I read and followed doc/conventions.md\n\n2) If you changed code files, add fast unit tests (happy path + 1 edge case). Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.\n\n3) Reference any architectural rationale in \`doc/vision.md\` and link to relevant issues.\n\nQuick examples (copy-paste):\n\nPython (pytest):\n```python\ndef test_my_feature_happy_path():\n    assert 1 + 1 == 2\n```\n\nJest + TypeScript:\n```ts\n// tests/example.test.ts\nimport { describe, test, expect } from '@jest/globals';\n\ndescribe('example suite', () => {\n  test('happy path', () => {\n    expect(1 + 2).toBe(3);\n  });\n});\n```\n\nResources:\n- Conventions: \`doc/conventions.md\`\n- Vision/design rationale: \`doc/vision.md\`\n\nIf you think this check is incorrect, reply here and request a maintainer review.\n`;
+
+            // List existing comments on this PR and try to find our bot comment
+            const commentsRes = await github.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const comments = commentsRes && commentsRes.data ? commentsRes.data : [];
+
+            const existing = comments.find(c => c && c.body && c.body.startsWith(botMarker) && c.user && (c.user.type === 'Bot' || c.user.login === 'github-actions[bot]'));
+
+            if (existing) {
+              // update existing comment
+              await github.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              // create new comment
+              await github.issues.createComment({ owner, repo, issue_number, body });
+            }

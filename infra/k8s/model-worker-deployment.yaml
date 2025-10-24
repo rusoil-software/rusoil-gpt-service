@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usptu-model-worker
+  labels:
+    app: usptu-model-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usptu-model-worker
+  template:
+    metadata:
+      labels:
+        app: usptu-model-worker
+    spec:
+      containers:
+        - name: model-worker
+          image: rusoil-gpt-service:latest
+          args: ["/bin/sh", "-c", "uvicorn app.model_worker:app --host 0.0.0.0 --port 8100"]
+          ports:
+            - containerPort: 8100
+          env:
+            - name: MODE
+              value: "prod"
+          resources:
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: usptu-model-worker-svc
+spec:
+  selector:
+    app: usptu-model-worker
+  ports:
+    - protocol: TCP
+      port: 8100
+      targetPort: 8100
+  type: ClusterIP

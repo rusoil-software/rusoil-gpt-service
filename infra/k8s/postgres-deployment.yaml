@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usptu-postgres
+  labels:
+    app: usptu-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usptu-postgres
+  template:
+    metadata:
+      labels:
+        app: usptu-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: usptu-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: usptu-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: "usptu"
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pgdata
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: usptu-postgres-svc
+spec:
+  selector:
+    app: usptu-postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP

@@ -1,0 +1,47 @@
+name: CI Build + Smoke
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          push: false
+          tags: rusoil-gpt-service:ci
+
+      - name: Run container with smoke server (no DB required)
+        run: |
+          # Run the built image but override the default CMD to start the lightweight smoke server
+          docker run -d --name usptu-ci -p 8000:8000 rusoil-gpt-service:ci python /app/backend/smoke_server.py || true
+
+      - name: Wait for service
+        run: |
+          for i in {1..20}; do 
+            if curl -sSf http://localhost:8000/health >/dev/null 2>&1; then echo ok && exit 0; fi; 
+            sleep 2; 
+          done; 
+          echo "Service did not become healthy"; exit 1
+
+      - name: Smoke test endpoint
+        run: |
+          curl -sS http://localhost:8000/health
+
+      - name: Stop container
+        if: always()
+        run: |
+          docker rm -f usptu-ci || true
