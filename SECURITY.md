@@ -95,8 +95,8 @@ By using or contributing to any repository, you acknowledge and agree that:
 
 ## 📬 Contact
 
-* **Security contact:** `ustyuzhaninky@hotmail.com` *(ustyuzhaninky)*
-* **Team Lead:** `[ustyuzhaninky](https://github.com/ustyuzhaninky)`
+* **Security contact:** ustyuzhaninky@hotmail.com *(ustyuzhaninky)*
+* **Team Lead:** [ustyuzhaninky](https://github.com/ustyuzhaninky)
 * **Organization:** [Rusoil Software on GitHub](https://github.com/Rusoil-Software)
 
 If you have questions about this policy or want to suggest improvements, open a **Discussion** under the “Security & Maintenance” category.
