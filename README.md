@@ -1,4 +1,4 @@
-USPTU GPT Service
+Petra is a Dockerized GPT Service developed in Ufa State Petroleum Technological University
 
 Short pointer:
 
