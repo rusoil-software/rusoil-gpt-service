@@ -1,5 +1,5 @@
 {
-  "name": "rusoil-gpt-service",
+  "name": "petra-gpt-service",
   "private": true,
   "scripts": {
     "test": "jest --runInBand",

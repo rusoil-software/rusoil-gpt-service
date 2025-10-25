@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rusoilgpt-postgres
+  name: petra-gpt-postgres
   labels:
-    app: rusoilgpt-postgres
+    app: petra-gpt-postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: rusoilgpt-postgres
+      app: petra-gpt-postgres
   template:
     metadata:
       labels:
-        app: rusoilgpt-postgres
+        app: petra-gpt-postgres
     spec:
       containers:
         - name: postgres
@@ -21,15 +21,15 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: rusoilgpt-secrets
+                  name: petra-gpt-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: rusoilgpt-secrets
+                  name: petra-gpt-secrets
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
-              value: "rusoilgpt"
+              value: "petra-gpt"
           ports:
             - containerPort: 5432
           volumeMounts:
@@ -43,10 +43,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: rusoilgpt-postgres-svc
+  name: petra-gpt-postgres-svc
 spec:
   selector:
-    app: rusoilgpt-postgres
+    app: petra-gpt-postgres
   ports:
     - protocol: TCP
       port: 5432

@@ -1,19 +1,19 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: rusoilgpt-ingress
+  name: petra-gpt-ingress
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "20m"
 spec:
   ingressClassName: nginx
   rules:
-    - host: rusoilgpt.local
+    - host: petra-gpt.local
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: rusoilgpt-backend-svc
+                name: petra-gpt-backend-svc
                 port:
                   number: 8000

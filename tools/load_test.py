@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple load-test helper for rusoil-gpt-service.
+"""Simple load-test helper for petra-gpt-service.
 
 Usage:
   python tools/load_test.py --url http://localhost:8000/health --concurrency 10 --requests 100

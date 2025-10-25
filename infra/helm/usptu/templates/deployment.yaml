@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "rusoilgpt.fullname" . }}
+  name: {{ include "petra-gpt.fullname" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "rusoilgpt.name" . }}
+      app: {{ include "petra-gpt.name" . }}
   template:
     metadata:
       labels:
-        app: {{ include "rusoilgpt.name" . }}
+        app: {{ include "petra-gpt.name" . }}
     spec:
       containers:
         - name: backend

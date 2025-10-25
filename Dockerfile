@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for rusoil-gpt-service (robust to missing frontend/backend)
+# Multi-stage Dockerfile for petra-gpt-service (robust to missing frontend/backend)
 
 # Stage 0: copy repo to a build area and optionally build frontend
 FROM node:18-alpine AS frontend-build

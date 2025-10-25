@@ -16,7 +16,7 @@ Quick start (docker-compose)
 2. Build your image locally:
 
 ```powershell
-docker build -t rusoil-gpt-service .
+docker build -t petra-gpt-service .
 docker compose -f infra/docker-compose.prod.yml up --build
 ```
 
@@ -25,7 +25,7 @@ Quick start (k8s, local)
 
 ```powershell
 # apply secrets (replace with secure tooling in prod)
-kubectl create secret generic rusoilgpt-secrets --from-literal=DATABASE_URL='postgres://rusoilgpt:pass@rusoilgpt-postgres-svc:5432/rusoilgpt' --from-literal=POSTGRES_USER=rusoilgpt --from-literal=POSTGRES_PASSWORD=rusoilgpt_pass
+kubectl create secret generic petra-gpt-secrets --from-literal=DATABASE_URL='postgres://petra-gpt:pass@petra-gpt-postgres-svc:5432/petra-gpt' --from-literal=POSTGRES_USER=petra-gpt --from-literal=POSTGRES_PASSWORD=petra-gpt_pass
 
 # apply manifests
 kubectl apply -f infra/k8s/postgres-deployment.yaml

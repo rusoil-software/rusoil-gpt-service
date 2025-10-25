@@ -22,12 +22,12 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: false
-          tags: rusoil-gpt-service:ci
+          tags: petra-gpt-service:ci
 
       - name: Run container with smoke server (no DB required)
         run: |
           # Run the built image but override the default CMD to start the lightweight smoke server
-          docker run -d --name rusoilgpt-ci -p 8000:8000 rusoil-gpt-service:ci python /app/backend/smoke_server.py || true
+          docker run -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py || true
 
       - name: Wait for service
         run: |
@@ -44,4 +44,4 @@ jobs:
       - name: Stop container
         if: always()
         run: |
-          docker rm -f rusoilgpt-ci || true
+          docker rm -f petra-gpt-ci || true

@@ -1,6 +1,6 @@
-## rusoil-gpt-service — Technical Vision (living blueprint)
+## petra-gpt-service — Technical Vision (living blueprint)
 
-This document records a concise, KISS-minded technical blueprint for rusoil-gpt-service. We'll iterate section-by-section; this file will grow as we confirm each part.
+This document records a concise, KISS-minded technical blueprint for petra-gpt-service. We'll iterate section-by-section; this file will grow as we confirm each part.
 
 Section: Technologies (MVP, KISS)
 ---------------------------------
@@ -39,7 +39,7 @@ Implementation notes (practical, KISS)
 - Simple CLI commands (README):
   - `poetry install` (backend)
   - `npm install` and `npm run dev` (frontend)
-  - `docker build -t rusoil-gpt-service .` and `docker run -p 8000:8000 -v ./models:/app/models -v ./data:/app/data rusoil-gpt-service`
+  - `docker build -t petra-gpt-service .` and `docker run -p 8000:8000 -v ./models:/app/models -v ./data:/app/data petra-gpt-service`
 
 Developer ergonomics
 - Local dev: provide a `docker-compose.dev.yml` that mounts `models/` and `data/` so students can run with a single command.
@@ -99,7 +99,7 @@ Goal: an obvious, minimal repository layout that a student can clone and start w
 Top-level layout (recommended):
 
 ```
-rusoil-gpt-service/
+petra-gpt-service/
 ├─ backend/                # FastAPI backend source (python package)
 │  ├─ app/
 │  │  ├─ main.py           # ASGI entrypoint
@@ -331,8 +331,8 @@ Secondary: Vibe-coding / Agent workflows (lightweight)
 - Security: sandboxing is disabled in default local dev mode, and in any shared environment agent actions must be explicitly allowed and run in isolated containers.
 
 VSCode integration (minimal hooks)
-- Basic extension features (phase 1): selection -> command palette -> send selection to RGPT chat -> display response in a panel.
-- UX: user selects code, presses `Ctrl+Shift+P -> RGPT: Ask`, extension opens a small input, the query is sent to local backend (configured via `rusoilgpt.host` in extension settings), the reply is shown in a WebView panel. For now, no automatic code-patching; only suggestion copy-paste.
+- Basic extension features (phase 1): selection -> command palette -> send selection to Petra chat -> display response in a panel.
+- UX: user selects code, presses `Ctrl+Shift+P -> Petra: Ask`, extension opens a small input, the query is sent to local backend (configured via `petra-gpt.host` in extension settings), the reply is shown in a WebView panel. For now, no automatic code-patching; only suggestion copy-paste.
 
 Accessibility and small-device UX
 - Ensure chat UI works on narrow screens; use readable fonts and clear contrast. Keep controls minimal: upload, send, regenerate, settings.
@@ -461,25 +461,25 @@ Why avoid heavy frameworks initially
 Section: VSCode extension (minimal design)
 ----------------------------------------
 
-Goal: provide a tiny, local-first VSCode extension that lets students select code/text and ask the RGPT assistant for help without leaving the editor. Keep behavior read-only (suggestions only) for safety.
+Goal: provide a tiny, local-first VSCode extension that lets students select code/text and ask the Petra assistant for help without leaving the editor. Keep behavior read-only (suggestions only) for safety.
 
 Core features (KISS):
-- Command: `RGPT: Ask Selection` — send the selected text (or current file) to the local RGPT backend and show the assistant's reply in a WebView panel.
-- Command: `RGPT: Open Chat` — open a lightweight chat panel inside VSCode that mirrors the browser UI for the current workspace.
-- Settings: `rusoilgpt.host` (default `http://localhost:8000`), `rusoilgpt.timeout`, and `rusoilgpt.mode` (local|prod).
+- Command: `Petra: Ask Selection` — send the selected text (or current file) to the local Petra backend and show the assistant's reply in a WebView panel.
+- Command: `Petra: Open Chat` — open a lightweight chat panel inside VSCode that mirrors the browser UI for the current workspace.
+- Settings: `petra-gpt.host` (default `http://localhost:8000`), `petra-gpt.timeout`, and `petra-gpt.mode` (local|prod).
 
 Message flow (simple)
-1. User selects text and runs `RGPT: Ask Selection`.
-2. Extension packages a payload { selection, filePath?, workspaceFolder? } and POSTs to `rusoilgpt.host/api/v1/vscode/ask` (or sends via WebSocket if available).
+1. User selects text and runs `Petra: Ask Selection`.
+2. Extension packages a payload { selection, filePath?, workspaceFolder? } and POSTs to `petra-gpt.host/api/v1/vscode/ask` (or sends via WebSocket if available).
 3. Backend returns a streamed or complete response. The extension renders response tokens progressively in the WebView and provides buttons: Copy, Insert (paste into file at cursor), Open in Chat.
 
 Security & UX choices
-- The extension targets local-first workflows and uses user-configured `rusoilgpt.host`. It must warn if connecting to an untrusted remote host.
+- The extension targets local-first workflows and uses user-configured `petra-gpt.host`. It must warn if connecting to an untrusted remote host.
 - No automatic file edits by default. If a user wants to apply a suggested patch, they must explicitly click `Insert` which pastes the suggestion at the cursor; an optional confirm dialog can be enabled in settings.
-- Authentication: extension can support token-based auth by reading `rusoilgpt.token` setting; for MVP, keep auth optional and document how to set tokens for prod.
+- Authentication: extension can support token-based auth by reading `petra-gpt.token` setting; for MVP, keep auth optional and document how to set tokens for prod.
 
 Packaging and testing (KISS)
-- Keep extension in `extensions/vscode-rusoilgpt/` inside the monorepo. Use `yo code` minimal TypeScript extension scaffold.
+- Keep extension in `extensions/vscode-petra-gpt/` inside the monorepo. Use `yo code` minimal TypeScript extension scaffold.
 - Provide a simple `npm run dev` that launches the extension in Extension Development Host and points it to the local backend.
 - Unit tests: small integration test that mocks the backend (or uses a local test server) and asserts the extension displays responses.
 
@@ -493,7 +493,7 @@ Section: Work scenarios (short, actionable workflows)
 Goal: describe concrete, minimal workflows for common users so we can validate the system with real tasks and tests. Each scenario lists the intent, steps, required components, and acceptance criteria for an MVP run.
 
 1) Student — Local coding & Q&A (primary)
-- Intent: student runs RGPT locally on their laptop to get help with class notes and small code snippets.
+- Intent: student runs Petra locally on their laptop to get help with class notes and small code snippets.
 - Steps:
   1. Clone repo, place a quantized model in `models/` or run `tools/download_test_model.py`.
   2. `poetry install` and `cd frontend && npm install`.
@@ -503,7 +503,7 @@ Goal: describe concrete, minimal workflows for common users so we can validate t
 - Acceptance criteria: user can upload a PDF or paste code, ask a question, and receive a streamed answer with at least one source snippet shown.
 
 2) Instructor — Multi-user classroom instance (small cluster)
-- Intent: a professor runs RGPT on a small server to allow several students to use the service concurrently for a course.
+- Intent: a professor runs Petra on a small server to allow several students to use the service concurrently for a course.
 - Steps:
   1. Provision a small VM (2–4 CPU, 8–16 GB RAM) or single-node cluster.
   2. Deploy via Docker Compose for initial testing (`docker compose up -d`) with MODE=prod but using local Postgres/MinIO or managed services.
@@ -523,7 +523,7 @@ Goal: describe concrete, minimal workflows for common users so we can validate t
 - Acceptance criteria: for a batch of N submissions, the system produces feedback artifacts (one file per submission) and an exportable summary within a reasonable time (depends on local resources); instructor can review and accept/reject suggestions.
 
 4) Research — data processing & experiments pipeline
-- Intent: researchers use RGPT to run experiments on large corpora (document ingestion, retrieval tuning, model evaluation).
+- Intent: researchers use Petra to run experiments on large corpora (document ingestion, retrieval tuning, model evaluation).
 - Steps:
   1. Provision a workstation or cluster with larger storage and CPU/GPU resources.
   2. Use `tools/ingest_corpus.py` to ingest large datasets into Faiss and SQLite/Postgres.

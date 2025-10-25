@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rusoilgpt.fullname" . }}-svc
+  name: {{ include "petra-gpt.fullname" . }}-svc
 spec:
   type: {{ .Values.service.type }}
   selector:
-    app: {{ include "rusoilgpt.name" . }}
+    app: {{ include "petra-gpt.name" . }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.port }}

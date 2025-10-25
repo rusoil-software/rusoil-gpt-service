@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   backend:
-    image: rusoil-gpt-service:latest
+    image: petra-gpt-service:latest
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -18,7 +18,7 @@ services:
       - ./data:/app/data
 
   model-worker:
-    image: rusoil-gpt-service:latest
+    image: petra-gpt-service:latest
     restart: unless-stopped
     command: ["/bin/sh", "-c", "uvicorn app.model_worker:app --host 0.0.0.0 --port 8100"]
     environment:
@@ -32,9 +32,9 @@ services:
     image: postgres:15
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-rusoilgpt}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rusoilgpt_pass}
-      - POSTGRES_DB=${POSTGRES_DB:-rusoilgpt}
+      - POSTGRES_USER=${POSTGRES_USER:-petra-gpt}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-petra-gpt_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-petra-gpt}
     volumes:
       - pgdata:/var/lib/postgresql/data
 

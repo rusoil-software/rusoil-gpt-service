@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rusoilgpt-model-worker
+  name: petra-gpt-model-worker
   labels:
-    app: rusoilgpt-model-worker
+    app: petra-gpt-model-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: rusoilgpt-model-worker
+      app: petra-gpt-model-worker
   template:
     metadata:
       labels:
-        app: rusoilgpt-model-worker
+        app: petra-gpt-model-worker
     spec:
       containers:
         - name: model-worker
-          image: rusoil-gpt-service:latest
+          image: petra-gpt-service:latest
           args: ["/bin/sh", "-c", "uvicorn app.model_worker:app --host 0.0.0.0 --port 8100"]
           ports:
             - containerPort: 8100
@@ -32,10 +32,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: rusoilgpt-model-worker-svc
+  name: petra-gpt-model-worker-svc
 spec:
   selector:
-    app: rusoilgpt-model-worker
+    app: petra-gpt-model-worker
   ports:
     - protocol: TCP
       port: 8100

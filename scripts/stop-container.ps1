@@ -1,5 +1,5 @@
 param(
-  [string]$Name = "rusoilgpt-local"
+  [string]$Name = "petra-gpt-local"
 )
 
 Write-Host "Stopping container $Name..."

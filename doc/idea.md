@@ -1,8 +1,8 @@
-## rusoil-gpt-service — Idea and Design
+## petra-gpt-service — Idea and Design
 
 Purpose
 -------
-rusoil-gpt-service is a Dockerized AI service providing modern AI features to university students and researchers. It exposes a simple chatbot web form and APIs for advanced features including:
+petra-gpt-service is a Dockerized AI service providing modern AI features to university students and researchers. It exposes a simple chatbot web form and APIs for advanced features including:
 
 - Vibe-coding (AIDD, agent-driven coding assistants)
 - Agent AI orchestration (multi-step autonomous agents)
@@ -108,7 +108,7 @@ Model & data choices
 
 Developer UX and local-first priority
 ------------------------------------
-- One-command local start: docker build . && docker run -p 8000:8000 rusoil-gpt-service
+- One-command local start: docker build . && docker run -p 8000:8000 petra-gpt-service
 - Provide a toggled configuration: local (CPU quantized), hybrid (use remote model APIs), and cloud (production endpoints).
 - Clear docs for adding a new model plugin and for switching between local and cloud models.
 

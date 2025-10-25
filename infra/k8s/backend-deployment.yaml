@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rusoilgpt-backend
+  name: petra-gpt-backend
   labels:
-    app: rusoilgpt-backend
+    app: petra-gpt-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: rusoilgpt-backend
+      app: petra-gpt-backend
   template:
     metadata:
       labels:
-        app: rusoilgpt-backend
+        app: petra-gpt-backend
     spec:
       containers:
         - name: backend
-          image: rusoil-gpt-service:latest
+          image: petra-gpt-service:latest
           ports:
             - containerPort: 8000
           env:
@@ -25,7 +25,7 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: rusoilgpt-secrets
+                  name: petra-gpt-secrets
                   key: DATABASE_URL
           readinessProbe:
             httpGet:
@@ -44,10 +44,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: rusoilgpt-backend-svc
+  name: petra-gpt-backend-svc
 spec:
   selector:
-    app: rusoilgpt-backend
+    app: petra-gpt-backend
   ports:
     - protocol: TCP
       port: 8000

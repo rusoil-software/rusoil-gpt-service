@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: rusoil-gpt-service
+  repository: petra-gpt-service
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -11,6 +11,6 @@ service:
 
 ingress:
   enabled: true
-  host: rusoilgpt.local
+  host: petra-gpt.local
 
 resources: {}
