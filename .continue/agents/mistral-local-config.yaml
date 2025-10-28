@@ -1,0 +1,62 @@
+name: Mistral Local Agent
+version: 1.0.0
+schema: v1
+models:
+  - name: Mistral 7B Agent
+    provider: ollama
+    model: mistral:7b-instruct
+    roles:
+      - chat
+      - edit
+      - apply
+    capabilities:
+      - tool_use
+    requestOptions:
+      temperature: 0.7
+      maxTokens: 1500
+  - name: Qwen2.5-Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base
+    roles:
+      - autocomplete
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text:latest
+    roles:
+      - embed
+  - name: Voyage Reranker
+    provider: voyage
+    apiKey: pa-4jH-duB7YdMBK0x3bEKrPQGvKjMHbKc05W8cHshZGFo
+    model: rerank-3.5
+    roles:
+      - rerank
+context:
+  - uses: continuedev/diff-context
+  - uses: continuedev/codebase-context
+  - uses: continuedev/url-context
+  - uses: continuedev/folder-context
+  - uses: continuedev/terminal-context
+  - uses: continuedev/code-context
+  - uses: continuedev/file-context
+  - provider: tree
+  - provider: file
+  - provider: terminal
+  - provider: codebase
+  - provider: diff
+  - provider: currentFile
+  - provider: problems
+  - provider: url
+  - provider: folder
+  - provider: code
+  - provider: open
+    params:
+      onlyPinned: true
+  - provider: repo-map
+    params:
+      includeSignatures: false # default true
+  - provider: os
+  - provider: debugger
+    params:
+      stackDepth: 3
+  - provider: web
+
