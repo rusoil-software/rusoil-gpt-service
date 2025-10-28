@@ -1,9 +1,11 @@
-name: filesystem
-version: 0.0.1
+name: Filesystem MCP
+version: 1.0.0
 schema: v1
+
 mcpServers:
-  - name: FileSystem
+  - name: Filesystem
     command: npx
     args:
-      - -y
-      - ".\\"
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "%HOME%:\\%CURRENTUSER%\\Projects\\rusoil-gpt-service"

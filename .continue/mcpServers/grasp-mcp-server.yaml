@@ -1,0 +1,8 @@
+name: GSAP Master MCP Server
+version: 1.0.0
+schema: v1
+mcpServers:
+  - name: GSAP Master
+    command: npx
+    args:
+      - bruzethegreat-gsap-master-mcp-server@latest

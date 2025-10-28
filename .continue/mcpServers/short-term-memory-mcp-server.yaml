@@ -1,0 +1,11 @@
+name: Session Memory Server
+version: 0.0.2
+schema: v1
+mcpServers:
+  - name: Session Memory
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-memory"
+    env:
+      MEMORY_FILE_PATH: D:/Memory/Short-term-memory/memory.json

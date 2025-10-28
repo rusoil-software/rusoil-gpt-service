@@ -1,0 +1,12 @@
+name: Memory MCP
+version: 1.0.0
+schema: v1
+
+mcpServers:
+  - name: Memory
+    command: cmd
+    args:
+      - "/c"
+      - "npx"
+      - "-y"
+      - "@modelcontextprotocol/server-memory"

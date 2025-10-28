@@ -1,0 +1,8 @@
+name: MCP Installer
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: MCP Installer
+    command: npx
+    args:
+      - "@anaisbetts/mcp-installer"

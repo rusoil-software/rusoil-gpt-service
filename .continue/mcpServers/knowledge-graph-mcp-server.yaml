@@ -1,0 +1,11 @@
+name: Knowledge Graph Memory
+version: 0.0.2
+schema: v1
+mcpServers:
+  - name: Knowledge Graph Memory
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-memory"
+    env:
+      MEMORY_FILE_PATH: ${{ inputs.MEMORY_FILE_PATH }}

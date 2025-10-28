@@ -1,0 +1,12 @@
+name: Docker MCP Sequential Thinking
+version: 1.0.1
+schema: v1
+
+mcpServers:
+  - name: Sequential Thinking
+    command: docker
+    args:
+      - run
+      - --rm
+      - -i
+      - mcp/sequentialthinking
