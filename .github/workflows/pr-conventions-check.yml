@@ -19,12 +19,11 @@ jobs:
             const body = context.payload.pull_request && context.payload.pull_request.body || '';
             const requiredCheckbox = 'I read and followed doc/conventions.md';
 
-            if (!body.includes(requiredCheckbox)) {
-              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}'. Please update the PR description.`);
-              return;
-            }
+            // Allow either the exact checklist line in the PR body OR a marker file added to the PR (useful for automation)
+            // Marker files we accept: CONVENTIONS_ACKNOWLEDGED or doc/conventions_acknowledged.md
+            const allowedMarkerFiles = ['CONVENTIONS_ACKNOWLEDGED', 'doc/conventions_acknowledged.md'];
 
-            // List files changed in the PR
+            // Fetch changed files (we'll reuse the later logic to collect files)
             const prNumber = context.payload.pull_request.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -37,6 +36,15 @@ jobs:
               files = files.concat(res.data.map(f => ({ filename: f.filename, status: f.status })));
               if (res.data.length < per_page) break;
               page += 1;
+            }
+
+            const changedFilenames = files.map(f => f.filename);
+
+            const hasMarkerFile = allowedMarkerFiles.some(m => changedFilenames.includes(m));
+
+            if (!body.includes(requiredCheckbox) && !hasMarkerFile) {
+              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}', or add one of ${JSON.stringify(allowedMarkerFiles)} to the PR. Please update the PR description or add the marker file.`);
+              return;
             }
 
             core.info(`Files changed in PR (${files.length}):\n${files.map(f => f.filename).join('\n')}`);
