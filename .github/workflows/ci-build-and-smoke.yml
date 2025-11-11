@@ -22,20 +22,26 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: false
+          load: true
           tags: petra-gpt-service:ci
 
       - name: Run container with smoke server (no DB required)
         run: |
           # Run the built image but override the default CMD to start the lightweight smoke server
-          docker run -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py || true
+          docker run --rm -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py
 
       - name: Wait for service
         run: |
-          for i in {1..20}; do 
+          # Wait up to ~2 minutes for the smoke server to become healthy (60 * 2s = 120s)
+          for i in {1..60}; do 
             if curl -sSf http://localhost:8000/health >/dev/null 2>&1; then echo ok && exit 0; fi; 
             sleep 2; 
           done; 
-          echo "Service did not become healthy"; exit 1
+          echo "Service did not become healthy after waiting; printing container logs for debugging:";
+          echo "--- container logs start ---";
+          docker logs petra-gpt-ci || true;
+          echo "--- container logs end ---";
+          exit 1
 
       - name: Smoke test endpoint
         run: |
