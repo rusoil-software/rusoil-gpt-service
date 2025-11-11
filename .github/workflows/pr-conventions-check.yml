@@ -38,12 +38,13 @@ jobs:
               page += 1;
             }
 
-            const changedFilenames = files.map(f => f.filename);
+            const changedFilenames = files.map(f => f.filename.toLowerCase());
 
-            const hasMarkerFile = allowedMarkerFiles.some(m => changedFilenames.includes(m));
+            // Accept marker files if any changed filename endsWith one of the allowed markers (case-insensitive)
+            const hasMarkerFile = changedFilenames.some(fn => allowedMarkerFiles.some(m => fn.endsWith(m.toLowerCase())));
 
             if (!body.includes(requiredCheckbox) && !hasMarkerFile) {
-              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}', or add one of ${JSON.stringify(allowedMarkerFiles)} to the PR. Please update the PR description or add the marker file.`);
+              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}', or add one of ${JSON.stringify(allowedMarkerFiles)} to the PR (filename match is case-insensitive). Please update the PR description or add the marker file.`);
               return;
             }
 
