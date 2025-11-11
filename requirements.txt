@@ -3,4 +3,3 @@ uvicorn
 pytest
 httpx
 requests
-requests

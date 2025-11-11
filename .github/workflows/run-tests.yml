@@ -25,6 +25,12 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Ensure pnpm available via corepack (guard)
+        run: |
+          # Enable corepack and prepare pnpm as an extra guard on older runners
+          corepack enable || true
+          corepack prepare pnpm@latest --activate || true
+
       - name: Ensure pnpm-lock.yaml exists
         run: |
           if [ ! -f pnpm-lock.yaml ]; then
