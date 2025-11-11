@@ -12,6 +12,34 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+      - name: Debug: print PR body and changed files (non-failing)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              const pr = context.payload.pull_request || {};
+              const body = pr.body || '';
+              core.info('--- PR BODY START ---');
+              core.info(body.substring(0, 8000));
+              core.info('--- PR BODY END ---');
+
+              const prNumber = pr.number;
+              if (!prNumber) { core.info('No PR number available in context'); return; }
+
+              let page = 1;
+              const per_page = 100;
+              let files = [];
+              while (true) {
+                const res = await github.pulls.listFiles({ owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber, per_page, page });
+                if (!res || !res.data) break;
+                files = files.concat(res.data.map(f => f.filename));
+                if (res.data.length < per_page) break;
+                page += 1;
+              }
+              core.info(`Changed files (${files.length}):\n${files.join('\n')}`);
+            } catch (e) {
+              core.info('Debug step failed to list PR files: ' + String(e));
+            }
       - name: Check PR body and changed files for conventions and tests
         uses: actions/github-script@v6
         with:
