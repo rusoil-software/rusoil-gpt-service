@@ -16,6 +16,10 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const context = github.context;
+
             try {
               const pr = context.payload.pull_request || {};
               const body = pr.body || '';
@@ -30,7 +34,12 @@ jobs:
               const per_page = 100;
               let files = [];
               while (true) {
+                if (pr && pr.listFiles) {
                 const res = await github.pulls.listFiles({ owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber, per_page, page });
+                                } else {
+                    core.info('PR object or listFiles method is undefined');
+                    break;
+                }
                 if (!res || !res.data) break;
                 files = files.concat(res.data.map(f => f.filename));
                 if (res.data.length < per_page) break;
@@ -45,6 +54,8 @@ jobs:
         with:
           script: |
             const core = require('@actions/core');
+            const github = require('@actions/github');
+            const context = github.context;
             const body = context.payload.pull_request && context.payload.pull_request.body || '';
             const requiredCheckbox = 'I read and followed doc/conventions.md';
 
@@ -60,7 +71,12 @@ jobs:
             let page = 1;
             let files = [];
             while (true) {
+              if (pr && pr.listFiles) {
               const res = await github.pulls.listFiles({ owner, repo, pull_number: prNumber, per_page, page });
+              } else {
+                    core.info('PR object or listFiles method is undefined');
+                    break;
+                }
               if (!res || !res.data) break;
               files = files.concat(res.data.map(f => ({ filename: f.filename, status: f.status })));
               if (res.data.length < per_page) break;
