@@ -149,16 +149,15 @@ def list_models() -> List[Dict[str, object]]:
 def get_model(name: str) -> Dict[str, object]:
     # Resolve model dir and candidate path, then ensure the candidate is inside model_dir
     model_dir = Path(os.getenv('MODEL_DIR', 'models')).resolve()
+    # Forbid absolute paths and path separators in name
+    if os.path.isabs(name) or any(sep in name for sep in [os.sep, os.altsep] if sep):
+        raise HTTPException(status_code=403, detail='invalid model name')
+    # Construct the absolute, normalized candidate path
     p = (model_dir / name).resolve()
 
     # Ensure the resolved path is within the model directory (prevent path traversal)
-    try:
-        is_subpath = p.is_relative_to(model_dir)
-    except AttributeError:
-        # Python <3.9 fallback: use os.path.commonpath to ensure containment
-        is_subpath = os.path.commonpath([str(model_dir), str(p)]) == str(model_dir)
-
-    if not is_subpath:
+    # Use os.path.commonpath for robust cross-version containment check
+    if os.path.commonpath([str(model_dir), str(p)]) != str(model_dir):
         raise HTTPException(status_code=403, detail='invalid model name')
 
     if not p.exists() or not p.is_file():
