@@ -16,8 +16,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const context = github.context;
-
             try {
               const pr = context.payload.pull_request || {};
               const body = pr.body || '';
