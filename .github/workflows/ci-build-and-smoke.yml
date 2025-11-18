@@ -45,7 +45,10 @@ jobs:
 
       - name: Smoke test endpoint
         run: |
-          curl -sS http://localhost:8000/health
+          echo "--- GET /health ---";
+          curl -sS http://localhost:8000/health;
+          echo "\n--- GET /metrics ---";
+          curl -sS http://localhost:8000/metrics || true;
 
       - name: Stop container
         if: always()
