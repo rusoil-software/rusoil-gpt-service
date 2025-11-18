@@ -8,19 +8,30 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # prometheus
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, Gauge, REGISTRY
 
 start_time = time.time()
 app = FastAPI(title="Petra GPT Service - Backend")
 
 # basic prometheus metrics
-HEALTH_CHECKS = Counter('petra_health_checks_total', 'Number of health checks')
-READY_CHECKS = Counter('petra_ready_checks_total', 'Number of readiness checks')
+
+def _safe_metric(ctor, name, *args, **kwargs):
+    try:
+        return ctor(name, *args, **kwargs)
+    except ValueError:
+        # metric already registered in global registry; try to return existing collector
+        existing = REGISTRY._names_to_collectors.get(name)
+        if existing is not None:
+            return existing
+        raise
+
+HEALTH_CHECKS = _safe_metric(Counter, 'petra_health_checks_total', 'Number of health checks')
+READY_CHECKS = _safe_metric(Counter, 'petra_ready_checks_total', 'Number of readiness checks')
 
 # HTTP metrics (method+path+status), latency histogram, and model-inference gauge
-HTTP_REQUESTS = Counter('http_requests_total', 'HTTP requests', ['method', 'path', 'status'])
-HTTP_REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration seconds', ['method', 'path'])
-MODEL_INFER_GAUGE = Gauge('model_inference_inprogress', 'In-progress model inference requests')
+HTTP_REQUESTS = _safe_metric(Counter, 'http_requests_total', 'HTTP requests', ['method', 'path', 'status'])
+HTTP_REQUEST_DURATION = _safe_metric(Histogram, 'http_request_duration_seconds', 'HTTP request duration seconds', ['method', 'path'])
+MODEL_INFER_GAUGE = _safe_metric(Gauge, 'model_inference_inprogress', 'In-progress model inference requests')
 
 # Toggle metrics collection via env var
 METRICS_ENABLED = os.getenv('METRICS_ENABLED', 'false').lower() in ('1', 'true', 'yes')

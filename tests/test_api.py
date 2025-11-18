@@ -1,18 +1,14 @@
 import os
 import tempfile
-from fastapi.testclient import TestClient
 
+# Enable metrics for these tests before importing the app so middleware registers
+os.environ['METRICS_ENABLED'] = 'true'
+
+from fastapi.testclient import TestClient
 from backend.app.main import app
 
 
-def make_client_with_metrics_enabled():
-    import os
-    os.environ['METRICS_ENABLED'] = 'true'
-    from fastapi.testclient import TestClient as TC
-    return TC(app)
-
-
-client = make_client_with_metrics_enabled()
+client = TestClient(app)
 
 
 def test_metrics_ok():
