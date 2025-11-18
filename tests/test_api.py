@@ -38,9 +38,15 @@ def test_models_listing_and_detail(tmp_path):
     j = r.json()
     names = {m['name'] for m in j}
     assert 'modelA.bin' in names and 'modelB.bin' in names
+    # check extra fields
+    for m in j:
+        assert 'path' in m and 'quantized' in m and 'size' in m and 'loaded' in m
 
     # detail
     r2 = client.get('/api/v1/models/modelA.bin')
     assert r2.status_code == 200
     j2 = r2.json()
     assert j2['name'] == 'modelA.bin'
+    # detail fields
+    assert 'path' in j2 and 'quantized' in j2 and 'quant_type' in j2 and 'loader_params' in j2
+    assert 'size_bytes' in j2 and 'created_at' in j2

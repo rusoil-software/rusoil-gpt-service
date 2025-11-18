@@ -3,6 +3,7 @@ import os.path
 import time
 from pathlib import Path
 from typing import Dict, List
+import re
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -129,42 +130,142 @@ def list_models() -> List[Dict[str, object]]:
 
     Reads `MODEL_DIR` environment variable (defaults to `models`).
     """
-    model_dir = Path(os.getenv('MODEL_DIR', 'models'))
-    if not model_dir.exists() or not model_dir.is_dir():
+    # Resolve a safe model directory anchored to the repository root.
+    repo_root = Path(__file__).resolve().parents[3]
+    raw_model_dir = Path(os.getenv('MODEL_DIR', 'models'))
+    # If the provided model dir is absolute, resolve it; otherwise consider it relative to the repo root.
+    if raw_model_dir.is_absolute():
+        model_dir = raw_model_dir.resolve()
+    else:
+        model_dir = (repo_root / raw_model_dir).resolve()
+
+    # If the provided model dir was absolute, accept it only if it exists and is a directory.
+    if raw_model_dir.is_absolute():
+        allowed = model_dir.exists() and model_dir.is_dir()
+    else:
+        # For relative paths enforce they resolve inside the repository root (defense-in-depth).
+        try:
+            allowed = model_dir.is_relative_to(repo_root)
+        except AttributeError:
+            allowed = str(model_dir).startswith(str(repo_root))
+
+    if not allowed or not model_dir.exists() or not model_dir.is_dir():
         return []
+
+    def human_size(n: int) -> str:
+        # simple human-readable size (K, M, G) following KISS
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if n < 1024.0:
+                return f"{n:.0f}{unit}" if unit == 'B' else f"{n:.1f}{unit}"
+            n /= 1024.0
+        return f"{n:.1f}PB"
+
+    def detect_quantized(fname: str) -> bool:
+        # naive detection: common quant markers
+        lowered = fname.lower()
+        markers = ['.q', 'quant', 'q4_', 'q5_', '.gguf.q']
+        return any(m in lowered for m in markers)
 
     result = []
     for p in sorted(model_dir.iterdir()):
         if p.is_file():
             stat = p.stat()
+            relpath = str(p.relative_to(model_dir))
+            q = detect_quantized(p.name)
             result.append({
                 'name': p.name,
-                'size': stat.st_size,
-                'modified': stat.st_mtime,
+                'path': relpath,
+                'quantized': q,
+                'size': human_size(stat.st_size),
+                'loaded': False,
             })
     return result
 
 
 @app.get("/api/v1/models/{name}")
 def get_model(name: str) -> Dict[str, object]:
-    # Sanitize user input using Werkzeug's secure_filename to ensure safe filenames
+    # Combine sanitization and repo-root anchoring to address CodeQL path-expression findings.
+    # First, sanitise the filename component using Werkzeug to remove dangerous characters.
     safe_name = secure_filename(name)
     if not safe_name:
-        raise HTTPException(status_code=403, detail='invalid model name')
-    model_dir = Path(os.getenv('MODEL_DIR', 'models')).resolve()
+        raise HTTPException(status_code=400, detail='invalid model name')
+
+    # Conservative validation: only allow reasonably short filenames after sanitization
+    if not re.match(r'^[A-Za-z0-9._-]{1,255}$', safe_name):
+        raise HTTPException(status_code=400, detail='invalid model name')
+
+    # Resolve a safe model directory anchored to the repository root (same logic as list_models)
+    repo_root = Path(__file__).resolve().parents[3]
+    raw_model_dir = Path(os.getenv('MODEL_DIR', 'models'))
+    if raw_model_dir.is_absolute():
+        model_dir = raw_model_dir.resolve()
+    else:
+        model_dir = (repo_root / raw_model_dir).resolve()
+
+    if raw_model_dir.is_absolute():
+        # allow absolute model dirs if they exist
+        allowed = model_dir.exists() and model_dir.is_dir()
+    else:
+        try:
+            allowed = model_dir.is_relative_to(repo_root)
+        except AttributeError:
+            allowed = str(model_dir).startswith(str(repo_root))
+
+    if not allowed:
+        # refuse to operate on externally-controlled model directories (relative values must be inside repo)
+        raise HTTPException(status_code=403, detail='model directory not allowed')
+
     # Construct the absolute, normalized candidate path with sanitized filename
     p = (model_dir / safe_name).resolve()
 
     # Ensure the resolved path is within the model directory (prevent path traversal)
-    # Use os.path.commonpath for robust cross-version containment check
-    if os.path.commonpath([str(model_dir), str(p)]) != str(model_dir):
+    try:
+        is_subpath = p.is_relative_to(model_dir)
+    except AttributeError:
+        is_subpath = str(p).startswith(str(model_dir))
+
+    if not is_subpath:
         raise HTTPException(status_code=403, detail='invalid model name')
 
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail='model not found')
 
     stat = p.stat()
-    return {'name': p.name, 'size': stat.st_size, 'modified': stat.st_mtime}
+
+    def detect_quant_type(fname: str) -> str:
+        lowered = fname.lower()
+        if 'q4_0' in lowered:
+            return 'q4_0'
+        if 'q4_1' in lowered:
+            return 'q4_1'
+        if 'q5_' in lowered:
+            return 'q5'
+        if '.gguf.q' in lowered:
+            return 'gguf.q'
+        if 'quant' in lowered:
+            return 'quantized'
+        return 'fp32'
+
+    quant_type = detect_quant_type(p.name)
+
+    # recommended loader params (kept minimal and safe)
+    loader_params = {
+        'threads': int(os.getenv('DEFAULT_THREADS', '4')),
+        'n_ctx': int(os.getenv('DEFAULT_N_CTX', '2048')),
+    }
+
+    return {
+        'name': p.name,
+        'path': str(p.relative_to(model_dir)),
+        'quantized': quant_type != 'fp32',
+        'quant_type': quant_type,
+        'loader_params': loader_params,
+        'size_bytes': stat.st_size,
+        'size': (lambda s: f"{s}B")(stat.st_size),
+        'created_at': stat.st_ctime,
+        'modified': stat.st_mtime,
+        'loaded': False,
+    }
 
 
 @app.get("/")
