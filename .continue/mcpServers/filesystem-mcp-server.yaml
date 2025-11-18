@@ -8,4 +8,4 @@ mcpServers:
     args:
       - "-y"
       - "@modelcontextprotocol/server-filesystem"
-      - "%HOME%:\\%CURRENTUSER%\\Projects\\rusoil-gpt-service"
+      - "D:\\ASUS\\Projects\\rusoil-gpt-service"
