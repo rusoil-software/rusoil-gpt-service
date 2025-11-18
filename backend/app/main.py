@@ -1,4 +1,5 @@
 import os
+import os.path
 import time
 from pathlib import Path
 from typing import Dict, List
@@ -154,8 +155,8 @@ def get_model(name: str) -> Dict[str, object]:
     try:
         is_subpath = p.is_relative_to(model_dir)
     except AttributeError:
-        # Python <3.9 fallback
-        is_subpath = str(p).startswith(str(model_dir))
+        # Python <3.9 fallback: use os.path.commonpath to ensure containment
+        is_subpath = os.path.commonpath([str(model_dir), str(p)]) == str(model_dir)
 
     if not is_subpath:
         raise HTTPException(status_code=403, detail='invalid model name')
