@@ -17,6 +17,7 @@ jobs:
         with:
           script: |
             try {
+              const core = require('@actions/core');
               const pr = context.payload.pull_request || {};
               const body = pr.body || '';
               core.info('--- PR BODY START ---');
@@ -38,7 +39,7 @@ jobs:
               }
               core.info(`Changed files (${files.length}):\n${files.join('\n')}`);
             } catch (e) {
-              core.info('Debug step failed to list PR files: ' + String(e));
+              try { const core = require('@actions/core'); core.info('Debug step failed to list PR files: ' + String(e)); } catch (_) { console.log('Debug step failed: ' + String(e)); }
             }
       - name: Check PR body and changed files for conventions and tests
         uses: actions/github-script@v6
