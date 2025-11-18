@@ -16,6 +16,10 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const context = github.context;
+
             try {
               const pr = context.payload.pull_request || {};
               const body = pr.body || '';
@@ -53,13 +57,14 @@ jobs:
             const allowedMarkerFiles = ['CONVENTIONS_ACKNOWLEDGED', 'doc/conventions_acknowledged.md'];
 
             // Fetch changed files (we'll reuse the later logic to collect files)
-            const prNumber = context.payload.pull_request.number;
+            const prNumber = context.payload.pull_request && context.payload.pull_request.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const per_page = 100;
             let page = 1;
             let files = [];
             while (true) {
+              if (!prNumber) { core.info('No PR number available in context'); break; }
               const res = await github.pulls.listFiles({ owner, repo, pull_number: prNumber, per_page, page });
               if (!res || !res.data) break;
               files = files.concat(res.data.map(f => ({ filename: f.filename, status: f.status })));
