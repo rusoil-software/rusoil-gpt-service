@@ -146,10 +146,23 @@ def list_models() -> List[Dict[str, object]]:
 
 @app.get("/api/v1/models/{name}")
 def get_model(name: str) -> Dict[str, object]:
-    model_dir = Path(os.getenv('MODEL_DIR', 'models'))
-    p = model_dir / name
+    # Resolve model dir and candidate path, then ensure the candidate is inside model_dir
+    model_dir = Path(os.getenv('MODEL_DIR', 'models')).resolve()
+    p = (model_dir / name).resolve()
+
+    # Ensure the resolved path is within the model directory (prevent path traversal)
+    try:
+        is_subpath = p.is_relative_to(model_dir)
+    except AttributeError:
+        # Python <3.9 fallback
+        is_subpath = str(p).startswith(str(model_dir))
+
+    if not is_subpath:
+        raise HTTPException(status_code=403, detail='invalid model name')
+
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail='model not found')
+
     stat = p.stat()
     return {'name': p.name, 'size': stat.st_size, 'modified': stat.st_mtime}
 
