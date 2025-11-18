@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Debug: print PR body and changed files (non-failing)
+      - name: "Debug: print PR body and changed files (non-failing)"
         uses: actions/github-script@v6
         with:
           script: |
