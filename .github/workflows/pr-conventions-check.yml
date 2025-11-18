@@ -17,7 +17,6 @@ jobs:
         with:
           script: |
             try {
-              const core = require('@actions/core');
               const pr = context.payload.pull_request || {};
               const body = pr.body || '';
               core.info('--- PR BODY START ---');
@@ -39,13 +38,13 @@ jobs:
               }
               core.info(`Changed files (${files.length}):\n${files.join('\n')}`);
             } catch (e) {
-              try { const core = require('@actions/core'); core.info('Debug step failed to list PR files: ' + String(e)); } catch (_) { console.log('Debug step failed: ' + String(e)); }
+              // core is available in this runtime; fall back to console.log for safety
+              try { core.info('Debug step failed to list PR files: ' + String(e)); } catch (_) { console.log('Debug step failed: ' + String(e)); }
             }
       - name: Check PR body and changed files for conventions and tests
         uses: actions/github-script@v6
         with:
           script: |
-            const core = require('@actions/core');
             const body = context.payload.pull_request && context.payload.pull_request.body || '';
             const requiredCheckbox = 'I read and followed doc/conventions.md';
 
