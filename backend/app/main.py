@@ -7,7 +7,7 @@ from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-
+from werkzeug.utils import secure_filename
 # prometheus
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, Gauge, REGISTRY
 
@@ -147,13 +147,13 @@ def list_models() -> List[Dict[str, object]]:
 
 @app.get("/api/v1/models/{name}")
 def get_model(name: str) -> Dict[str, object]:
-    # Resolve model dir and candidate path, then ensure the candidate is inside model_dir
-    model_dir = Path(os.getenv('MODEL_DIR', 'models')).resolve()
-    # Forbid absolute paths and path separators in name
-    if os.path.isabs(name) or any(sep in name for sep in [os.sep, os.altsep] if sep):
+    # Sanitize user input using Werkzeug's secure_filename to ensure safe filenames
+    safe_name = secure_filename(name)
+    if not safe_name:
         raise HTTPException(status_code=403, detail='invalid model name')
-    # Construct the absolute, normalized candidate path
-    p = (model_dir / name).resolve()
+    model_dir = Path(os.getenv('MODEL_DIR', 'models')).resolve()
+    # Construct the absolute, normalized candidate path with sanitized filename
+    p = (model_dir / safe_name).resolve()
 
     # Ensure the resolved path is within the model directory (prevent path traversal)
     # Use os.path.commonpath for robust cross-version containment check
