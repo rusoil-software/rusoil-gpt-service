@@ -4,101 +4,168 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
+concurrency:
+  group: pr-conventions-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read            # required to read files / list PR files
+  pull-requests: read
+  issues: write             # required to create/update comments
+
 jobs:
   enforce-conventions:
+    name: Enforce PR conventions & tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: "Debug: print PR body and changed files (non-failing)"
+
+      - name: Gather PR body and changed files
+        id: get_pr_data
         uses: actions/github-script@v6
         with:
           script: |
+            /**
+             * Fetch PR body and list changed files (paginated).
+             * Exposes outputs:
+             *   pr_body - limited to first 8000 chars for logs/outputs
+             *   files_json - JSON array [{ filename, status }]
+             */
             try {
-              const pr = context.payload.pull_request || {};
-              const body = pr.body || '';
-              core.info('--- PR BODY START ---');
-              core.info(body.substring(0, 8000));
-              core.info('--- PR BODY END ---');
+              const pr = context.payload.pull_request;
+              if (!pr) {
+                core.info('No pull_request in context (maybe this run was triggered differently).');
+                core.setOutput('pr_body', '');
+                core.setOutput('files_json', '[]');
+                return;
+              }
 
               const prNumber = pr.number;
-              if (!prNumber) { core.info('No PR number available in context'); return; }
-
-              let page = 1;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
               const per_page = 100;
-              let files = [];
+              let page = 1;
+              const files = [];
+
               while (true) {
-                const res = await github.pulls.listFiles({ owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber, per_page, page });
+                const res = await github.pulls.listFiles({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                  per_page,
+                  page
+                });
+
                 if (!res || !res.data) break;
-                files = files.concat(res.data.map(f => f.filename));
+                for (const f of res.data) {
+                  files.push({ filename: f.filename, status: f.status || null });
+                }
+
                 if (res.data.length < per_page) break;
                 page += 1;
+
+                // Defensive: don't loop forever on unexpected conditions
+                if (page > 50) {
+                  core.info('Pagination guard tripped (page > 50). Stopping further fetches.');
+                  break;
+                }
               }
-              core.info(`Changed files (${files.length}):\n${files.join('\n')}`);
-            } catch (e) {
-              // core is available in this runtime; fall back to console.log for safety
-              try { core.info('Debug step failed to list PR files: ' + String(e)); } catch (_) { console.log('Debug step failed: ' + String(e)); }
+
+              // set outputs (stringified)
+              core.setOutput('pr_body', (pr.body || '').substring(0, 8000));
+              core.setOutput('files_json', JSON.stringify(files));
+              core.info(`Found ${files.length} changed files in PR #${prNumber}`);
+            } catch (err) {
+              core.error('Failed to collect PR data: ' + String(err));
+              core.setOutput('pr_body', '');
+              core.setOutput('files_json', '[]');
             }
-      - name: Check PR body and changed files for conventions and tests
+
+      - name: Debug: print PR body and changed files (non-failing)
+        id: debug_print
         uses: actions/github-script@v6
         with:
           script: |
-            const body = context.payload.pull_request && context.payload.pull_request.body || '';
-            const requiredCheckbox = 'I read and followed doc/conventions.md';
+            // Print PR body and file list for diagnostics (non-failing)
+            const prBody = '${{ steps.get_pr_data.outputs.pr_body }}' || '';
+            const files = JSON.parse('${{ steps.get_pr_data.outputs.files_json }}' || '[]');
 
-            // Allow either the exact checklist line in the PR body OR a marker file added to the PR (useful for automation)
-            // Marker files we accept: CONVENTIONS_ACKNOWLEDGED or doc/conventions_acknowledged.md
-            const allowedMarkerFiles = ['CONVENTIONS_ACKNOWLEDGED', 'doc/conventions_acknowledged.md'];
+            core.info('--- PR BODY START ---');
+            core.info(prBody || '(empty)');
+            core.info('--- PR BODY END ---');
 
-            // Fetch changed files (we'll reuse the later logic to collect files)
-            const prNumber = context.payload.pull_request && context.payload.pull_request.number;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const per_page = 100;
-            let page = 1;
-            let files = [];
-            while (true) {
-              if (!prNumber) { core.info('No PR number available in context'); break; }
-              const res = await github.pulls.listFiles({ owner, repo, pull_number: prNumber, per_page, page });
-              if (!res || !res.data) break;
-              files = files.concat(res.data.map(f => ({ filename: f.filename, status: f.status })));
-              if (res.data.length < per_page) break;
-              page += 1;
+            core.info(`Changed files (${files.length}):`);
+            for (const f of files.slice(0, 500)) {
+              core.info(` - ${f.filename}`);
             }
+            if (files.length > 500) core.info(`... (${files.length - 500} more files omitted from log)`);
 
-            const changedFilenames = files.map(f => f.filename.toLowerCase());
+      - name: Check PR body and changed files for conventions and tests
+        id: check_conventions
+        uses: actions/github-script@v6
+        env:
+          PR_BODY: ${{ steps.get_pr_data.outputs.pr_body }}
+          FILES_JSON: ${{ steps.get_pr_data.outputs.files_json }}
+        with:
+          script: |
+            /**
+             * Validations:
+             *  - PR body must include the exact checklist item OR
+             *    a marker file must be present among changed files
+             *  - If code files were modified, ensure tests are added/modified
+             */
+            const body = (process.env.PR_BODY || '').trim();
+            const files = JSON.parse(process.env.FILES_JSON || '[]');
 
-            // Accept marker files if any changed filename endsWith one of the allowed markers (case-insensitive)
-            const hasMarkerFile = changedFilenames.some(fn => allowedMarkerFiles.some(m => fn.endsWith(m.toLowerCase())));
+            // required checklist (allow both raw text and checkbox variation)
+            const requiredText = 'I read and followed doc/conventions.md';
+            const checkboxRegex = /^\s*[-*]\s*\[\s*[xX]?\s*\]\s*I read and followed doc\/conventions\.md/m;
 
-            if (!body.includes(requiredCheckbox) && !hasMarkerFile) {
-              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}', or add one of ${JSON.stringify(allowedMarkerFiles)} to the PR (filename match is case-insensitive). Please update the PR description or add the marker file.`);
+            // marker files that indicate acknowledgement (case-insensitive match on endsWith)
+            const allowedMarkerFiles = ['CONVENTIONS_ACKNOWLEDGED', 'doc/conventions_acknowledged.md'];
+            const lowerMarkers = allowedMarkerFiles.map(m => m.toLowerCase());
+
+            const normalizedFilenames = files.map(f => (f.filename || '').toLowerCase());
+
+            const hasRequiredText = body.includes(requiredText) || checkboxRegex.test(body);
+            const hasMarkerFile = normalizedFilenames.some(fn => lowerMarkers.some(m => fn.endsWith(m)));
+
+            if (!hasRequiredText && !hasMarkerFile) {
+              core.setFailed(
+                `PR description must include the checklist line: '${requiredText}' (exact text) ` +
+                `or the checkbox variant (e.g. '- [x] ${requiredText}'), or include one of the marker files: ${JSON.stringify(allowedMarkerFiles)}.` 
+              );
               return;
             }
 
-            core.info(`Files changed in PR (${files.length}):\n${files.map(f => f.filename).join('\n')}`);
-
-            // Identify code files (likely to require tests)
+            // Identify code vs test files
             const codeFileRe = /\.(py|ts|tsx|js|jsx)$/i;
             const testFileRe = /(^|\/)tests?(\/|$)|(^|\/)(__tests__)(\/|$)|\.test\.(js|ts|tsx|py)$|\.spec\.(js|ts|tsx)$/i;
 
             const changedCodeFiles = files.filter(f => codeFileRe.test(f.filename) && !testFileRe.test(f.filename));
+            const changedTestFiles = files.filter(f => testFileRe.test(f.filename));
+
+            core.info(`Changed code files: ${changedCodeFiles.length}`);
+            core.info(`Changed test files: ${changedTestFiles.length}`);
 
             if (changedCodeFiles.length === 0) {
-              core.info('No code files changed that require unit tests.');
+              core.info('No code files detected that would require unit tests; nothing more to do.');
               return;
             }
 
-            // Check if any of the changed files include tests
-            const changedTestFiles = files.filter(f => testFileRe.test(f.filename));
-
+            // If code changed, require at least one test change
             if (changedTestFiles.length === 0) {
-              core.setFailed('This PR modifies code files but does not add or modify unit tests. Please add fast unit tests (happy path + 1 edge case) under a tests/ folder or using *.test.* / *.spec.* patterns.');
-            } else {
-              core.info(`Found test files in PR:\n${changedTestFiles.map(f => f.filename).join('\n')}`);
+              core.setFailed('This PR modifies code files but does not add or modify unit tests. ' +
+                'Please add fast unit tests (happy path + 1 edge case) under a `tests/` folder or using `*.test.*` / `*.spec.*` patterns.');
+              return;
             }
+
+            core.info('PR passes conventions check (checkbox/marker + tests present).');
 
       - name: Post or update PR comment with remediation steps (on failure)
         if: failure()
@@ -106,26 +173,69 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            if (!pr) return;
+            if (!pr) {
+              core.info('No PR available to comment on.');
+              return;
+            }
+
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const issue_number = pr.number;
 
-            // Marker used to identify the bot's comment so it can be updated instead of duplicated
             const botMarker = '<!-- pr-conventions-check -->';
+            const requiredText = 'I read and followed doc/conventions.md';
 
-            const body = `${botMarker}\nThanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:\n\n1) Add the exact checklist line to the PR description:\n   - I read and followed doc/conventions.md\n\n2) If you changed code files, add fast unit tests (happy path + 1 edge case). Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.\n\n3) Reference any architectural rationale in \`doc/vision.md\` and link to relevant issues.\n\nQuick examples (copy-paste):\n\nPython (pytest):\n```python\ndef test_my_feature_happy_path():\n    assert 1 + 1 == 2\n```\n\nJest + TypeScript:\n```ts\n// tests/example.test.ts\nimport { describe, test, expect } from '@jest/globals';\n\ndescribe('example suite', () => {\n  test('happy path', () => {\n    expect(1 + 2).toBe(3);\n  });\n});\n```\n\nResources:\n- Conventions: \`doc/conventions.md\`\n- Vision/design rationale: \`doc/vision.md\`\n\nIf you think this check is incorrect, reply here and request a maintainer review.\n`;
+            const body = `${botMarker}
+Thanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:
 
-            // List existing comments on this PR and try to find our bot comment
+1) Add the exact checklist line to the PR description:
+   - ${requiredText}
+
+   (You may also use a checkbox: "- [x] ${requiredText}")
+
+2) If you changed code files, add fast unit tests (happy path + 1 edge case).
+   Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.
+
+3) Reference any architectural rationale in \`doc/vision.md\` and link relevant issues.
+
+Quick examples (copy-paste):
+
+Python (pytest):
+\`\`\`python
+def test_my_feature_happy_path():
+    assert 1 + 1 == 2
+\`\`\`
+
+Jest + TypeScript:
+\`\`\`ts
+// tests/example.test.ts
+import { describe, test, expect } from '@jest/globals';
+
+describe('example suite', () => {
+  test('happy path', () => {
+    expect(1 + 2).toBe(3);
+  });
+});
+\`\`\`
+
+Resources:
+- Conventions: \`doc/conventions.md\`
+- Vision/design rationale: \`doc/vision.md\`
+
+If you think this check is incorrect, reply here and request a maintainer review.
+`;
+
+            // Find existing comment by bot marker
             const commentsRes = await github.issues.listComments({ owner, repo, issue_number, per_page: 100 });
-            const comments = commentsRes && commentsRes.data ? commentsRes.data : [];
+            const comments = (commentsRes && commentsRes.data) || [];
 
-            const existing = comments.find(c => c && c.body && c.body.startsWith(botMarker) && c.user && (c.user.type === 'Bot' || c.user.login === 'github-actions[bot]'));
+            const existing = comments.find(c => c && c.body && c.body.startsWith(botMarker) &&
+              (c.user && (c.user.type === 'Bot' || c.user.login === 'github-actions[bot]')));
 
             if (existing) {
-              // update existing comment
               await github.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              core.info('Updated existing bot comment.');
             } else {
-              // create new comment
               await github.issues.createComment({ owner, repo, issue_number, body });
+              core.info('Created remediation comment on PR.');
             }
