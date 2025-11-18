@@ -32,8 +32,8 @@ jobs:
 
       - name: Wait for service
         run: |
-          # Wait up to ~2 minutes for the smoke server to become healthy (60 * 2s = 120s)
-          for i in {1..60}; do 
+          # Wait up to 30 seconds for the smoke server to become healthy (15 * 2s = 30s)
+          for i in {1..15}; do 
             if curl -sSf http://localhost:8000/health >/dev/null 2>&1; then echo ok && exit 0; fi; 
             sleep 2; 
           done; 
@@ -48,7 +48,15 @@ jobs:
           echo "--- GET /health ---";
           curl -sS http://localhost:8000/health;
           echo "\n--- GET /metrics ---";
-          curl -sS http://localhost:8000/metrics || true;
+          METRICS_BODY=$(curl -sS http://localhost:8000/metrics || true);
+          echo "$METRICS_BODY";
+          # Ensure metrics contains at least one known metric name
+          if echo "$METRICS_BODY" | grep -q "petra_dummy_metric\|petra_health_checks_total\|http_requests_total"; then
+            echo "metrics OK";
+          else
+            echo "metrics did not contain expected metric names";
+            exit 1;
+          fi
 
       - name: Stop container
         if: always()

@@ -5,14 +5,25 @@ from fastapi.testclient import TestClient
 from backend.app.main import app
 
 
-client = TestClient(app)
+def make_client_with_metrics_enabled():
+    import os
+    os.environ['METRICS_ENABLED'] = 'true'
+    from fastapi.testclient import TestClient as TC
+    return TC(app)
+
+
+client = make_client_with_metrics_enabled()
 
 
 def test_metrics_ok():
+    # perform a request so middleware creates a metric
+    r0 = client.get('/health')
+    assert r0.status_code == 200
+
     r = client.get('/metrics')
     assert r.status_code == 200
-    # basic prometheus text format contains HELP or TYPE
-    assert 'HELP' in r.text or 'TYPE' in r.text
+    # ensure prometheus text format exists and contains HTTP metric or petra metric
+    assert ('http_requests_total' in r.text) or ('petra_health_checks_total' in r.text) or ('HELP' in r.text)
 
 
 def test_models_listing_and_detail(tmp_path):

@@ -3,8 +3,9 @@ import time
 from pathlib import Path
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # prometheus
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter
@@ -15,6 +16,14 @@ app = FastAPI(title="Petra GPT Service - Backend")
 # basic prometheus metrics
 HEALTH_CHECKS = Counter('petra_health_checks_total', 'Number of health checks')
 READY_CHECKS = Counter('petra_ready_checks_total', 'Number of readiness checks')
+
+# HTTP metrics (method+path+status), latency histogram, and model-inference gauge
+HTTP_REQUESTS = Counter('http_requests_total', 'HTTP requests', ['method', 'path', 'status'])
+HTTP_REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration seconds', ['method', 'path'])
+MODEL_INFER_GAUGE = Gauge('model_inference_inprogress', 'In-progress model inference requests')
+
+# Toggle metrics collection via env var
+METRICS_ENABLED = os.getenv('METRICS_ENABLED', 'false').lower() in ('1', 'true', 'yes')
 
 
 def uptime_seconds() -> float:
@@ -66,6 +75,33 @@ def ready():
     if result["ok"]:
         return JSONResponse(status_code=200, content={"status": "ready", **result["details"]})
     return JSONResponse(status_code=503, content={"status": "not-ready", **result["details"]})
+
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if not METRICS_ENABLED:
+            return await call_next(request)
+
+        method = request.method
+        path = request.url.path
+        MODEL_INFER_GAUGE.inc(0)
+        start = time.time()
+        try:
+            response = await call_next(request)
+            status = str(response.status_code)
+            return response
+        finally:
+            duration = time.time() - start
+            try:
+                HTTP_REQUESTS.labels(method=method, path=path, status=status).inc()
+                HTTP_REQUEST_DURATION.labels(method=method, path=path).observe(duration)
+            except Exception:
+                # be defensive: metrics instrumentation should not break requests
+                pass
+
+
+if METRICS_ENABLED:
+    app.add_middleware(MetricsMiddleware)
 
 
 @app.get("/metrics")
