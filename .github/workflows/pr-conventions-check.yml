@@ -126,19 +126,14 @@ jobs:
             const requiredText = 'I read and followed doc/conventions.md';
             const checkboxRegex = /^\s*[-*]\s*\[\s*[xX]?\s*\]\s*I read and followed doc\/conventions\.md/m;
 
-            // marker files that indicate acknowledgement (case-insensitive match on endsWith)
-            const allowedMarkerFiles = ['CONVENTIONS_ACKNOWLEDGED', 'doc/conventions_acknowledged.md'];
-            const lowerMarkers = allowedMarkerFiles.map(m => m.toLowerCase());
-
             const normalizedFilenames = files.map(f => (f.filename || '').toLowerCase());
 
             const hasRequiredText = body.includes(requiredText) || checkboxRegex.test(body);
-            const hasMarkerFile = normalizedFilenames.some(fn => lowerMarkers.some(m => fn.endsWith(m)));
 
-            if (!hasRequiredText && !hasMarkerFile) {
+            if (!hasRequiredText) {
               core.setFailed(
                 `PR description must include the checklist line: '${requiredText}' (exact text) ` +
-                `or the checkbox variant (e.g. '- [x] ${requiredText}'), or include one of the marker files: ${JSON.stringify(allowedMarkerFiles)}.` 
+                `or the checkbox variant (e.g. '- [x] ${requiredText}').` 
               );
               return;
             }
