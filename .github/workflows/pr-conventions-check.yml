@@ -16,15 +16,17 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            // Safe logger: prefer `core.info` if available, fall back to console.log
+            const _log = (msg) => { if (typeof core !== 'undefined' && core && typeof core.info === 'function') core.info(msg); else console.log(msg); };
             try {
               const pr = context.payload.pull_request || {};
               const body = pr.body || '';
-              core.info('--- PR BODY START ---');
-              core.info(body.substring(0, 8000));
-              core.info('--- PR BODY END ---');
+              _log('--- PR BODY START ---');
+              _log(body.substring(0, 8000));
+              _log('--- PR BODY END ---');
 
               const prNumber = pr.number;
-              if (!prNumber) { core.info('No PR number available in context'); return; }
+              if (!prNumber) { _log('No PR number available in context'); return; }
 
               let page = 1;
               const per_page = 100;
@@ -36,15 +38,16 @@ jobs:
                 if (res.data.length < per_page) break;
                 page += 1;
               }
-              core.info(`Changed files (${files.length}):\n${files.join('\n')}`);
+              _log(`Changed files (${files.length}):\n${files.join('\n')}`);
             } catch (e) {
-              // core is available in this runtime; fall back to console.log for safety
-              try { core.info('Debug step failed to list PR files: ' + String(e)); } catch (_) { console.log('Debug step failed: ' + String(e)); }
+              try { _log('Debug step failed to list PR files: ' + String(e)); } catch (_) { console.log('Debug step failed: ' + String(e)); }
             }
       - name: Check PR body and changed files for conventions and tests
         uses: actions/github-script@v6
         with:
           script: |
+            // Safe logger
+            const _log = (msg) => { if (typeof core !== 'undefined' && core && typeof core.info === 'function') core.info(msg); else console.log(msg); };
             const body = context.payload.pull_request && context.payload.pull_request.body || '';
             const requiredCheckbox = 'I read and followed doc/conventions.md';
 
@@ -73,11 +76,10 @@ jobs:
             const hasMarkerFile = changedFilenames.some(fn => allowedMarkerFiles.some(m => fn.endsWith(m.toLowerCase())));
 
             if (!body.includes(requiredCheckbox) && !hasMarkerFile) {
-              core.setFailed(`PR description must include the exact checklist item: '${requiredCheckbox}', or add one of ${JSON.stringify(allowedMarkerFiles)} to the PR (filename match is case-insensitive). Please update the PR description or add the marker file.`);
-              return;
+              throw new Error(`PR description must include the exact checklist item: '${requiredCheckbox}', or add one of ${JSON.stringify(allowedMarkerFiles)} to the PR (filename match is case-insensitive). Please update the PR description or add the marker file.`);
             }
 
-            core.info(`Files changed in PR (${files.length}):\n${files.map(f => f.filename).join('\n')}`);
+            _log(`Files changed in PR (${files.length}):\n${files.map(f => f.filename).join('\n')}`);
 
             // Identify code files (likely to require tests)
             const codeFileRe = /\.(py|ts|tsx|js|jsx)$/i;
@@ -104,7 +106,8 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const core = require('@actions/core');
+            // Safe logger
+            const _log = (msg) => { if (typeof core !== 'undefined' && core && typeof core.info === 'function') core.info(msg); else console.log(msg); };
             const pr = context.payload.pull_request;
             if (!pr) return;
             const owner = context.repo.owner;
@@ -114,7 +117,7 @@ jobs:
             // Marker used to identify the bot's comment so it can be updated instead of duplicated
             const botMarker = '<!-- pr-conventions-check -->';
 
-            const body = `${botMarker}\nThanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:\n\n1) Add the exact checklist line to the PR description:\n   - I read and followed doc/conventions.md\n\n2) If you changed code files, add fast unit tests (happy path + 1 edge case). Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.\n\n3) Reference any architectural rationale in \`doc/vision.md\` and link to relevant issues.\n\nQuick examples (copy-paste):\n\nPython (pytest):\n```python\ndef test_my_feature_happy_path():\n    assert 1 + 1 == 2\n```\n\nJest + TypeScript:\n```ts\n// tests/example.test.ts\nimport { describe, test, expect } from '@jest/globals';\n\ndescribe('example suite', () => {\n  test('happy path', () => {\n    expect(1 + 2).toBe(3);\n  });\n});\n```\n\nResources:\n- Conventions: \`doc/conventions.md\`\n- Vision/design rationale: \`doc/vision.md\`\n\nIf you think this check is incorrect, reply here and request a maintainer review.\n`;
+            const body = `${botMarker}\nThanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:\n\n1) Add the exact checklist line to the PR description:\n   - I read and followed doc/conventions.md\n\n2) If you changed code files, add fast unit tests (happy path + 1 edge case). Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.\n\n3) Reference any architectural rationale in \`doc/vision.md\` and link to relevant issues.\n\nQuick examples (copy-paste):\n\nPython (pytest):\n\```python\ndef test_my_feature_happy_path():\n    assert 1 + 1 == 2\n\```\n\nJest + TypeScript:\n\```ts\n// tests/example.test.ts\nimport { describe, test, expect } from '@jest/globals';\n\ndescribe('example suite', () => {\n  test('happy path', () => {\n    expect(1 + 2).toBe(3);\n  });\n});\n\```\n\nResources:\n- Conventions: \`doc/conventions.md\`\n- Vision/design rationale: \`doc/vision.md\`\n\nIf you think this check is incorrect, reply here and request a maintainer review.\n`;
 
             // List existing comments on this PR and try to find our bot comment
             const commentsRes = await github.issues.listComments({ owner, repo, issue_number, per_page: 100 });
