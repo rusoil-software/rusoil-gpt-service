@@ -228,7 +228,7 @@ jobs:
               (c.user && (c.user.type === 'Bot' || c.user.login === 'github-actions[bot]')));
 
             if (existing) {
-              await github?.issues?..updateComment?.({ owner, repo, comment_id: existing.id, body });
+              await github?.issues?.updateComment?.({ owner, repo, comment_id: existing.id, body });
               core.info('Updated existing bot comment.');
             } else {
               await github?.issues?.createComment?.({ owner, repo, issue_number, body });
