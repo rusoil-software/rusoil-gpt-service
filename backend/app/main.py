@@ -70,7 +70,20 @@ def check_readiness() -> Dict[str, object]:
     return {"ok": ok, "details": details}
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    summary="Liveness / health check",
+    responses={
+        200: {
+            "description": "Service is healthy",
+            "content": {
+                "application/json": {
+                    "example": {"status": "ok", "uptime": 12.34, "version": "0.0.0"}
+                }
+            },
+        }
+    },
+)
 def health():
     HEALTH_CHECKS.inc()
     payload = {
@@ -81,7 +94,14 @@ def health():
     return JSONResponse(status_code=200, content=payload)
 
 
-@app.get("/ready")
+@app.get(
+    "/ready",
+    summary="Readiness check",
+    responses={
+        200: {"description": "Service ready", "content": {"application/json": {"example": {"status": "ready", "mode": "local"}}}},
+        503: {"description": "Service not ready", "content": {"application/json": {"example": {"status": "not-ready", "mode": "prod"}}}},
+    },
+)
 def ready():
     READY_CHECKS.inc()
     result = check_readiness()
@@ -117,14 +137,32 @@ if METRICS_ENABLED:
     app.add_middleware(MetricsMiddleware)
 
 
-@app.get("/metrics")
+@app.get(
+    "/metrics",
+    summary="Prometheus metrics (read-only)",
+    responses={
+        200: {
+            "description": "Prometheus metrics in text format",
+            "content": {"text/plain": {"example": "# HELP petra_health_checks_total Number of health checks\npetra_health_checks_total 1"}},
+        }
+    },
+)
 def metrics():
     """Expose Prometheus metrics"""
     data = generate_latest()
     return PlainTextResponse(content=data.decode('utf-8'), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/api/v1/models")
+@app.get(
+    "/api/v1/models",
+    summary="List available models",
+    responses={
+        200: {
+            "description": "List of models with minimal metadata",
+            "content": {"application/json": {"example": [{"name": "model.ggml", "path": "model.ggml", "quantized": False, "size": "1KB", "loaded": False}]}}
+        }
+    },
+)
 def list_models() -> List[Dict[str, object]]:
     """List available local models with basic metadata.
 
@@ -182,7 +220,18 @@ def list_models() -> List[Dict[str, object]]:
     return result
 
 
-@app.get("/api/v1/models/{name}")
+@app.get(
+    "/api/v1/models/{name}",
+    summary="Get model metadata",
+    responses={
+        200: {
+            "description": "Detailed metadata for a single model",
+            "content": {"application/json": {"example": {"name": "model.ggml", "path": "model.ggml", "quantized": True, "quant_type": "q4_0", "loader_params": {"threads": 4, "n_ctx": 2048}, "size_bytes": 123456, "created_at": 1600000000}}}
+        },
+        403: {"description": "Invalid/forbidden model name"},
+        404: {"description": "Model not found"},
+    },
+)
 def get_model(name: str) -> Dict[str, object]:
     # Combine sanitization and repo-root anchoring to address CodeQL path-expression findings.
     # First, sanitise the filename component using Werkzeug to remove dangerous characters.
