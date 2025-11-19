@@ -53,7 +53,7 @@ jobs:
               const files = [];
 
               while (true) {
-                const res = await github.pulls.listFiles({
+                const res = await github?.pulls?.listFiles?.({
                   owner,
                   repo,
                   pull_number: prNumber,
@@ -221,7 +221,7 @@ jobs:
             `;
 
             // Find existing comment by bot marker
-            const commentsRes = await github.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const commentsRes = await github?.issues?.listComments?.({ owner, repo, issue_number, per_page: 100 });
             const comments = (commentsRes && commentsRes.data) || [];
 
             const existing = comments.find(c => c && c.body && c.body.startsWith(botMarker) &&
