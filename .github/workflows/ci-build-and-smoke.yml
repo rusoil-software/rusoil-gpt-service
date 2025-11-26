@@ -27,19 +27,33 @@ jobs:
       - name: Run container with smoke server (no DB required)
         run: |
           # Run the built image but override the default CMD to start the lightweight smoke server
-          docker run -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py || true
+          docker run -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py
 
-      - name: Wait for service
+      - name: Wait for health endpoint
         run: |
-          for i in {1..20}; do 
-            if curl -sSf http://localhost:8000/health >/dev/null 2>&1; then echo ok && exit 0; fi; 
-            sleep 2; 
+          for i in {1..30}; do 
+            if curl -sSf http://localhost:8000/health | grep -q \"healthy\"; then 
+              echo "Service is healthy"; 
+              break; 
+            fi; 
+            sleep 1; 
           done; 
-          echo "Service did not become healthy"; exit 1
+          if ! curl -sSf http://localhost:8000/health | grep -q \"healthy\"; then 
+            echo "Service did not become healthy within 30 seconds"; 
+            exit 1; 
+          fi
 
-      - name: Smoke test endpoint
+      - name: Verify metrics endpoint
         run: |
-          curl -sS http://localhost:8000/health
+          response=$(curl -sS http://localhost:8000/metrics)
+          if echo "$response" | grep -q "service_requests_total"; then
+            echo "Found expected metric in /metrics response"
+            exit 0
+          else
+            echo "/metrics response does not contain expected metrics:"
+            echo "$response"
+            exit 1
+          fi
 
       - name: Stop container
         if: always()
