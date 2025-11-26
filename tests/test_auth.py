@@ -84,6 +84,7 @@ def test_get_me_unauthorized():
 def test_get_me_authorized():
     """
     Test accessing /auth/me with valid token.
+    Verifies that the JWT middleware properly authenticates and provides user data.
     """
     # First get token
     login_response = client.post(
@@ -107,6 +108,10 @@ def test_get_me_authorized():
     assert data["is_admin"] is True
     assert "id" in data
     assert "is_active" in data
+    
+    # Verify user is available in request state (middleware functionality)
+    assert hasattr(client.app.state, 'user')
+    assert client.app.state.user.username == "admin"
 
 def test_get_me_invalid_token():
     """
@@ -125,27 +130,26 @@ def test_get_me_expired_token():
     """
     Test accessing /auth/me with expired token.
     """
-    with patch('backend.app.auth.security.datetime') as mock_datetime:
-        # Mock current time
-        mock_datetime.utcnow.return_value = 1000
-        
-        # Create token that expires in 1 second
-        token = client.app.state.auth.create_access_token(
-            data={"sub": "1", "username": "test"},
-            expires_delta=1
-        )
-        
-        # Mock time to be after expiration
-        mock_datetime.utcnow.return_value = 2000
-        
-        response = client.get(
-            "/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        
-        assert response.status_code == 401
-        data = response.json()
-        assert data["detail"] == "Invalid or expired token"
+    from backend.app.auth.security import create_access_token
+    
+    # Create token that expires in 1 second
+    token = create_access_token(
+        data={"sub": "1", "username": "test"},
+        expires_delta=1
+    )
+    
+    # Wait for token to expire
+    import time
+    time.sleep(2)
+    
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    assert response.status_code == 401
+    data = response.json()
+    assert data["detail"] == "Invalid or expired token"
 
 def test_admin_initialization():
     """

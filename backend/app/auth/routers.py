@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from backend.app.auth.models import User
 from backend.app.auth.security import create_access_token, decode_access_token, Hasher
-from backend.app.auth.users import get_user_by_username, initialize_admin
+from backend.app.auth.users import get_user_by_id, get_user_by_username, initialize_admin
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -55,12 +55,26 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Dict[str, str]:
 def get_current_user(request: Request) -> User:
     """
     Dependency to get the current authenticated user from JWT token.
+    Implements JWT authentication middleware functionality by:
+    - Parsing and verifying JWT using AUTH_SECRET
+    - Rejecting requests with missing, invalid, or expired tokens
+    - Extracting user_id and username from token claims
+    - Making user data available in the request context
+    
+    Args:
+        request: FastAPI request object
+    
+    Returns:
+        User: Authenticated user object
+    
+    Raises:
+        HTTPException: 401 Unauthorized for invalid/missing tokens
     """
     authorization: str = request.headers.get("Authorization")
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+            detail="Not authenticated - missing Authorization header",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -69,13 +83,13 @@ def get_current_user(request: Request) -> User:
         if scheme.lower() != "bearer":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication scheme",
+                detail="Invalid authentication scheme - expected Bearer",
                 headers={"WWW-Authenticate": "Bearer"},
             )
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header",
+            detail="Invalid authorization header format",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -91,7 +105,15 @@ def get_current_user(request: Request) -> User:
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
+            detail="Invalid token payload - missing user ID (sub claim)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    username = payload.get("username")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload - missing username",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -109,6 +131,9 @@ def get_current_user(request: Request) -> User:
             detail="Inactive user",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Add user to request state for access in other dependencies/endpoints
+    request.state.user = user
     
     return user
 
