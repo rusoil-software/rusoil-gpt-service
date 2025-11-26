@@ -1,23 +1,25 @@
-#!/usr/bin/env python3
-"""Tiny HTTP smoke server used by CI to validate the image is runnable.
-
-Provides:
- - GET /health -> 200
- - GET /ready  -> 200
-
-This avoids requiring the full backend stack (DB, models) in CI.
-"""
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import threading
+import time
+
+# Global variable to track startup
+startup_time = time.time()
 
 
-class Handler(BaseHTTPRequestHandler):
+class SmokeHandler(BaseHTTPRequestHandler):
+    def _set_headers(self, status=200, content_type="text/plain"):
+        self.send_response(status)
+        self.send_header('Content-type', content_type)
+        self.end_headers()
+
     def do_GET(self):
+        # Always serve from main thread, no threading issues
         if self.path in ("/health", "/ready"):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            payload = {'status': 'ok', 'path': self.path}
+            payload = {'status': 'ok', 'path': self.path, 'timestamp': time.time()}
             self.wfile.write(json.dumps(payload).encode('utf-8'))
         elif self.path == '/metrics':
             self.send_response(200)
@@ -27,18 +29,16 @@ class Handler(BaseHTTPRequestHandler):
             metrics = '# HELP petra_dummy_metric A dummy metric for smoke tests\n# TYPE petra_dummy_metric gauge\npetra_dummy_metric 1\n'
             self.wfile.write(metrics.encode('utf-8'))
         else:
-            self.send_response(404)
-            self.end_headers()
+            self._set_headers(404)
+            self.wfile.write(b"Not Found")
 
 
-def run(host='0.0.0.0', port=8000):
-    server = HTTPServer((host, port), Handler)
-    print(f"Smoke server listening on http://{host}:{port}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        server.server_close()
 
+def run_server(port=8000):
+    server_address = ('', port)
+    httpd = HTTPServer(server_address, SmokeHandler)
+    print(f'Starting smoke server on port {port}...')
+    httpd.serve_forever()
 
-if __name__ == '__main__':
-    run()
+if __name__ == "__main__":
+    run_server()

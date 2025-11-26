@@ -28,10 +28,27 @@ jobs:
       - name: Run container with smoke server (no DB required)
         run: |
           # Run the built image but override the default CMD to start the lightweight smoke server
+<<<<<<< HEAD
+          docker run -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py
+=======
           docker run --rm -d --name petra-gpt-ci -p 8000:8000 petra-gpt-service:ci python /app/backend/smoke_server.py
+>>>>>>> 1307c30509d1223b7528706b02be233238408c29
 
-      - name: Wait for service
+      - name: Wait for health endpoint
         run: |
+<<<<<<< HEAD
+          for i in {1..30}; do 
+            if curl -sSf http://localhost:8000/health | grep -q \"healthy\"; then 
+              echo "Service is healthy"; 
+              break; 
+            fi; 
+            sleep 1; 
+          done; 
+          if ! curl -sSf http://localhost:8000/health | grep -q \"healthy\"; then 
+            echo "Service did not become healthy within 30 seconds"; 
+            exit 1; 
+          fi
+=======
           # Wait up to 30 seconds for the smoke server to become healthy (15 * 2s = 30s)
           for i in {1..15}; do 
             if curl -sSf http://localhost:8000/health >/dev/null 2>&1; then echo ok && exit 0; fi; 
@@ -42,9 +59,20 @@ jobs:
           docker logs petra-gpt-ci || true;
           echo "--- container logs end ---";
           exit 1
+>>>>>>> 1307c30509d1223b7528706b02be233238408c29
 
-      - name: Smoke test endpoint
+      - name: Verify metrics endpoint
         run: |
+<<<<<<< HEAD
+          response=$(curl -sS http://localhost:8000/metrics)
+          if echo "$response" | grep -q "service_requests_total"; then
+            echo "Found expected metric in /metrics response"
+            exit 0
+          else
+            echo "/metrics response does not contain expected metrics:"
+            echo "$response"
+            exit 1
+=======
           echo "--- GET /health ---";
           curl -sS http://localhost:8000/health;
           echo "\n--- GET /metrics ---";
@@ -56,6 +84,7 @@ jobs:
           else
             echo "metrics did not contain expected metric names";
             exit 1;
+>>>>>>> 1307c30509d1223b7528706b02be233238408c29
           fi
 
       - name: Stop container
