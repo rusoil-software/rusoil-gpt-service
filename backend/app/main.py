@@ -5,6 +5,7 @@ from typing import Dict
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi import Depends
 
 start_time = time.time()
 app = FastAPI(title="Petra GPT Service - Backend")
@@ -41,6 +42,80 @@ def check_readiness() -> Dict[str, object]:
     return {"ok": ok, "details": details}
 
 
+# -------------------------
+# Prometheus metrics setup
+# -------------------------
+METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("1", "true", "yes")
+
+if METRICS_ENABLED:
+    REQUEST_COUNT = Counter(
+        "petra_http_requests_total", "Total HTTP requests", ["method", "path", "status"]
+    )
+    REQUEST_LATENCY = Histogram(
+        "petra_http_request_latency_seconds", "HTTP request latency seconds", ["method", "path"]
+    )
+    MODEL_INFER_INPROGRESS = Gauge(
+        "petra_model_inference_inprogress", "Number of in-progress model inference requests", ["model"]
+    )
+    MODEL_INFER_DURATION = Histogram(
+        "petra_model_inference_duration_seconds", "Model inference duration seconds", ["model"]
+    )
+
+
+    @app.middleware("http")
+    async def prometheus_middleware(request: Request, call_next):
+        method = request.method
+        path = request.url.path
+        with REQUEST_LATENCY.labels(method=method, path=path).time():
+            resp = await call_next(request)
+        try:
+            status = str(resp.status_code)
+        except Exception:
+            status = "500"
+        REQUEST_COUNT.labels(method=method, path=path, status=status).inc()
+        return resp
+else:
+    # No-op placeholders so code can reference names safely
+    REQUEST_COUNT = None
+    REQUEST_LATENCY = None
+    MODEL_INFER_INPROGRESS = None
+    MODEL_INFER_DURATION = None
+
+
+# -------------------------
+# Models API
+# -------------------------
+
+
+class ModelInfo(BaseModel):
+    name: str
+    path: str
+    size_bytes: int
+    modified_ts: float
+
+
+def _discover_models() -> List[ModelInfo]:
+    models_dir = Path(os.getenv("MODELS_DIR", "models"))
+    items: List[ModelInfo] = []
+    if not models_dir.exists() or not models_dir.is_dir():
+        return items
+    for p in sorted(models_dir.iterdir()):
+        if p.is_file():
+            try:
+                stat = p.stat()
+                items.append(
+                    ModelInfo(
+                        name=p.stem,
+                        path=str(p.resolve()),
+                        size_bytes=stat.st_size,
+                        modified_ts=stat.st_mtime,
+                    )
+                )
+            except Exception:
+                continue
+    return items
+
+
 @app.get("/health")
 def health():
     payload = {
@@ -62,3 +137,16 @@ def ready():
 @app.get("/")
 def index():
     return {"msg": "Petra backend (health endpoints available at /health and /ready)"}
+
+
+# --- Authentication protected endpoint example
+from .auth import get_current_user
+
+
+@app.get("/api/v1/me")
+def who_am_i(user=Depends(get_current_user)):
+    """Protected endpoint: returns decoded user info from the JWT token.
+
+    Requires Authorization: Bearer <token> header. If missing or invalid, returns 401.
+    """
+    return {"user": user.dict()}

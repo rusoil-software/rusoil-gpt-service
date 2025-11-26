@@ -1,0 +1,216 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Run pytest (METRICS_ENABLED=true)
+        env:
+          METRICS_ENABLED: 'true'
+        run: |
+          pytest -q
+
+      - name: Upload pytest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: ./.pytest_cache || true
+
+      - name: Comment on GitHub issue when tests succeed
+        if: ${{ success() }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = parseInt(process.env.ISSUE_NUMBER || '2', 10);
+            const body = `CI tests passed for commit ${process.env.GITHUB_SHA} on branch ${process.env.GITHUB_REF}.\n\n- METRICS_ENABLED: true\n- Tests: pytest run and passed\n\nFiles changed: requirements.txt, backend/app/main.py, tests/test_metrics_and_models.py, dev-setup.md, .github/workflows/ci.yml`;
+            await github.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue_number,
+              body: body,
+            });
+
+  smoke:
+    name: Smoke tests (health + metrics)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Start backend (uvicorn)
+        env:
+          METRICS_ENABLED: 'true'
+        run: |
+          # Start uvicorn in the background on port 8001; write logs to file
+          nohup uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 > uvicorn.log 2>&1 &
+          echo $! > uvicorn.pid
+
+      - name: Wait for /health (timeout 30s)
+        run: |
+          set -e
+          MAX_WAIT=30
+          WAITED=0
+          until [ $WAITED -ge $MAX_WAIT ]; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8001/health || echo 000)
+            echo "health status: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Service is healthy"
+              break
+            fi
+            sleep 1
+            WAITED=$((WAITED+1))
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: /health did not return 200 within ${MAX_WAIT}s" >&2
+            cat uvicorn.log || true
+            exit 1
+          fi
+
+      - name: Check /metrics contains expected names
+        run: |
+          METRICS=$(curl -s http://127.0.0.1:8001/metrics || true)
+          echo "$METRICS" | head -c 400 || true
+          if [ -z "$METRICS" ]; then
+            echo "ERROR: /metrics empty" >&2
+            exit 1
+          fi
+          echo "$METRICS" | grep -E "petra_http_requests_total|petra_http_request_latency_seconds|petra_model_inference_duration_seconds|# HELP" || (
+            echo "ERROR: expected metric names not found in /metrics" >&2
+            exit 1
+          )
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f uvicorn.pid ]; then
+            kill $(cat uvicorn.pid) || true
+          fi
+
+  smoke-auth:
+    name: Smoke auth tests (protected endpoint)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Start backend (uvicorn) for auth smoke
+        env:
+          AUTH_SECRET: 'changeme'
+        run: |
+          nohup uvicorn backend.app.main:app --host 127.0.0.1 --port 8002 > uvicorn-auth.log 2>&1 &
+          echo $! > uvicorn-auth.pid
+
+      - name: Wait for /health (timeout 30s)
+        run: |
+          MAX_WAIT=30
+          WAITED=0
+          until [ $WAITED -ge $MAX_WAIT ]; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/health || echo 000)
+            echo "health status: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              break
+            fi
+            sleep 1
+            WAITED=$((WAITED+1))
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: /health did not return 200 within ${MAX_WAIT}s" >&2
+            cat uvicorn-auth.log || true
+            exit 1
+          fi
+
+      - name: Check unauthenticated returns 401
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/api/v1/me || true)
+          echo "status: $CODE"
+          if [ "$CODE" != "401" ]; then
+            echo "ERROR: expected 401 for missing auth, got $CODE" >&2
+            exit 1
+          fi
+
+      - name: Check invalid token returns 401
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer this.is.invalid" http://127.0.0.1:8002/api/v1/me || true)
+          echo "status: $CODE"
+          if [ "$CODE" != "401" ]; then
+            echo "ERROR: expected 401 for invalid token, got $CODE" >&2
+            exit 1
+          fi
+
+      - name: Check expired token returns 401
+        run: |
+          EXPIRED_TOKEN=$(python -c "import jwt,time,os; payload={'user_id':'x1','username':'expired','iat':int(time.time()),'exp':int(time.time())-10}; print(jwt.encode(payload, os.getenv('AUTH_SECRET','changeme'), algorithm='HS256'))")
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $EXPIRED_TOKEN" http://127.0.0.1:8002/api/v1/me || true)
+          echo "status: $CODE"
+          if [ "$CODE" != "401" ]; then
+            echo "ERROR: expected 401 for expired token, got $CODE" >&2
+            exit 1
+          fi
+
+      - name: Check valid token returns 200
+        run: |
+          VALID_TOKEN=$(python -c "import jwt,time,os; payload={'user_id':'ok1','username':'smoke','iat':int(time.time()),'exp':int(time.time())+300}; print(jwt.encode(payload, os.getenv('AUTH_SECRET','changeme'), algorithm='HS256'))")
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $VALID_TOKEN" http://127.0.0.1:8002/api/v1/me || true)
+          echo "status: $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "ERROR: expected 200 for valid token, got $CODE" >&2
+            exit 1
+          fi
+
+      - name: Stop backend (auth)
+        if: always()
+        run: |
+          if [ -f uvicorn-auth.pid ]; then
+            kill $(cat uvicorn-auth.pid) || true
+          fi
