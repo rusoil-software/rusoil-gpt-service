@@ -12,8 +12,26 @@ from werkzeug.utils import secure_filename
 # prometheus
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, Gauge, REGISTRY
 
+# auth
+from backend.app.auth.routers import router as auth_router
+from backend.app.auth.users import initialize_admin
+
 start_time = time.time()
 app = FastAPI(title="Petra GPT Service - Backend")
+
+# security: ensure AUTH_SECRET is set in production
+if os.getenv("MODE", "local").lower() != "local" and not os.getenv("AUTH_SECRET"):
+    import warnings
+    warnings.warn(
+        "AUTH_SECRET is not set. Set AUTH_SECRET environment variable for production security.",
+        RuntimeWarning
+    )
+
+# Initialize admin user if needed (create default admin on first run)
+initialize_admin()
+
+# Include authentication routes
+app.include_router(auth_router)
 
 # basic prometheus metrics
 
