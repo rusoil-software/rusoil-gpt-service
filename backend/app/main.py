@@ -5,10 +5,13 @@ from pathlib import Path
 from typing import Dict, List
 import re
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from werkzeug.utils import secure_filename
+
+# auth
+from backend.app.auth.routers import get_current_user
 # prometheus
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, Gauge, REGISTRY
 
@@ -180,8 +183,9 @@ def metrics():
             "content": {"application/json": {"example": [{"name": "model.ggml", "path": "model.ggml", "quantized": False, "size": "1KB", "loaded": False}]}}
         }
     },
+    dependencies=[Depends(get_current_user)]
 )
-def list_models() -> List[Dict[str, object]]:
+def list_models(current_user: dict = Depends(get_current_user)) -> List[Dict[str, object]]:
     """List available local models with basic metadata.
 
     Reads `MODEL_DIR` environment variable (defaults to `models`).
@@ -249,8 +253,9 @@ def list_models() -> List[Dict[str, object]]:
         403: {"description": "Invalid/forbidden model name"},
         404: {"description": "Model not found"},
     },
+    dependencies=[Depends(get_current_user)]
 )
-def get_model(name: str) -> Dict[str, object]:
+def get_model(name: str, current_user: dict = Depends(get_current_user)) -> Dict[str, object]:
     # Combine sanitization and repo-root anchoring to address CodeQL path-expression findings.
     # First, sanitise the filename component using Werkzeug to remove dangerous characters.
     safe_name = secure_filename(name)
