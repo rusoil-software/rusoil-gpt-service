@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,40 +17,89 @@ def startup_event():
     """
     initialize_admin()
 
-@router.post("/login", response_model=Dict[str, str])
-def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Dict[str, str]:
+@router.post("/login", response_model=Dict[str, str],
+         summary="Authenticate user and return JWT",
+         description="Verify username and password, and return a signed JWT token for session management.",
+         responses={
+             200: {
+                 "description": "Successful authentication",
+                 "content": {
+                     "application/json": {
+                         "example": {
+                             "access_token": "eyJhbGciOiJIUzI1NiIs...",
+                             "token_type": "bearer"
+                         }
+                     }
+                 }
+             },
+             401: {
+                 "description": "Invalid credentials",
+                 "content": {
+                     "application/json": {
+                         "example": {
+                             "detail": "Incorrect username or password"
+                         }
+                     }
+                 }
+             }
+         })
+def login(username: str = Body(..., embed=True), password: str = Body(..., embed=True)) -> Dict[str, str]:
     """
-    Authenticate user and return JWT access token.
+    Authenticate user with username and password and return JWT access token.
     
-    - **username**: User's username
-    - **password**: User's password
+    This endpoint supports both JSON and form data input.
+    
+    Args:
+        username (str): User's username
+        password (str): User's password
+    
+    Returns:
+        Dict[str, str]: JSON response with access_token and token_type
+    
+    Raises:
+        HTTPException: 401 Unauthorized for invalid credentials
     """
-    user = get_user_by_username(form_data.username)
+    # First try to find user by username
+    user = get_user_by_username(username)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Check if user is active
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Inactive user",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not Hasher.verify_password(form_data.password, user.hashed_password):
+    
+    # Verify password using bcrypt
+    if not Hasher.verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Generate access token with claims
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
-        data={"sub": str(user.id), "username": user.username},
+        data={
+            "sub": str(user.id),
+            "username": user.username,
+            "iat": datetime.utcnow(),
+            "exp": datetime.utcnow() + access_token_expires
+        },
         expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 def get_current_user(request: Request) -> User:
     """

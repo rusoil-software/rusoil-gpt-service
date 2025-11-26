@@ -1,8 +1,10 @@
 import os
 import json
 import pytest
+from datetime import datetime
 from fastapi.testclient import TestClient
 from unittest.mock import patch
+from fastapi import Body
 
 # Set test environment before importing app
 os.environ['MODE'] = 'test'
@@ -16,9 +18,8 @@ client = TestClient(app)
 
 def test_login_success():
     """
-    Test successful login with valid credentials.
+    Test successful login with valid credentials using form data.
     """
-    # First, ensure admin user is created
     response = client.post(
         "/auth/login",
         data={"username": "admin", "password": "test-admin-password"},
@@ -30,10 +31,43 @@ def test_login_success():
     assert "access_token" in data
     assert data["token_type"] == "bearer"
     assert len(data["access_token"]) > 0
+    
+    # Verify token contains required claims
+    from backend.app.auth.security import decode_access_token
+    payload = decode_access_token(data["access_token"])
+    assert payload is not None
+    assert "sub" in payload
+    assert "username" in payload
+    assert "iat" in payload
+    assert "exp" in payload
+
+def test_login_success_json():
+    """
+    Test successful login with valid credentials using JSON.
+    """
+    response = client.post(
+        "/auth/login",
+        json={"username": "admin", "password": "test-admin-password"}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert len(data["access_token"]) > 0
+    
+    # Verify token contains required claims
+    from backend.app.auth.security import decode_access_token
+    payload = decode_access_token(data["access_token"])
+    assert payload is not None
+    assert "sub" in payload
+    assert "username" in payload
+    assert "iat" in payload
+    assert "exp" in payload
 
 def test_login_invalid_username():
     """
-    Test login with invalid username.
+    Test login with invalid username using form data.
     """
     response = client.post(
         "/auth/login",
@@ -45,9 +79,22 @@ def test_login_invalid_username():
     data = response.json()
     assert data["detail"] == "Incorrect username or password"
 
+def test_login_invalid_username_json():
+    """
+    Test login with invalid username using JSON.
+    """
+    response = client.post(
+        "/auth/login",
+        json={"username": "invalid", "password": "test-admin-password"}
+    )
+    
+    assert response.status_code == 401
+    data = response.json()
+    assert data["detail"] == "Incorrect username or password"
+
 def test_login_invalid_password():
     """
-    Test login with invalid password.
+    Test login with invalid password using form data.
     """
     response = client.post(
         "/auth/login",
@@ -59,18 +106,79 @@ def test_login_invalid_password():
     data = response.json()
     assert data["detail"] == "Incorrect username or password"
 
-def test_login_missing_credentials():
+def test_login_invalid_password_json():
     """
-    Test login with missing credentials.
+    Test login with invalid password using JSON.
     """
     response = client.post(
         "/auth/login",
-        data={},
+        json={"username": "admin", "password": "invalid-password"}
+    )
+    
+    assert response.status_code == 401
+    data = response.json()
+    assert data["detail"] == "Incorrect username or password"
+
+def test_login_missing_username():
+    """
+    Test login with missing username.
+    """
+    response = client.post(
+        "/auth/login",
+        data={"password": "test-admin-password"},
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     
-    # Should return 422 for validation error
     assert response.status_code == 422
+    
+    response = client.post(
+        "/auth/login",
+        json={"password": "test-admin-password"}
+    )
+    
+    assert response.status_code == 422
+
+def test_login_missing_password():
+    """
+    Test login with missing password.
+    """
+    response = client.post(
+        "/auth/login",
+        data={"username": "admin"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    
+    assert response.status_code == 422
+    
+    response = client.post(
+        "/auth/login",
+        json={"username": "admin"}
+    )
+    
+    assert response.status_code == 422
+
+def test_login_empty_credentials():
+    """
+    Test login with empty credentials.
+    """
+    response = client.post(
+        "/auth/login",
+        data={"username": "", "password": ""},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    
+    assert response.status_code == 401
+    data = response.json()
+    assert data["detail"] == "Incorrect username or password"
+    
+    response = client.post(
+        "/auth/login",
+        json={"username": "", "password": ""}
+    )
+    
+    assert response.status_code == 401
+    data = response.json()
+    assert data["detail"] == "Incorrect username or password"
 
 def test_get_me_unauthorized():
     """
