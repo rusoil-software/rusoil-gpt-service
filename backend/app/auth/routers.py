@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 
 from backend.app.auth.models import User
@@ -59,6 +59,40 @@ def login(username: str = Body(..., embed=True), password: str = Body(..., embed
     Raises:
         HTTPException: 401 Unauthorized for invalid credentials
     """
+    
+    # Validate input
+    if not username or not password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Username and password are required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # First try to find user by username
+    user = get_user_by_username(username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Verify password using bcrypt
+    if not Hasher.verify_password(password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     # First try to find user by username
     user = get_user_by_username(username)
     if not user:

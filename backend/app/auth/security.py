@@ -28,13 +28,20 @@ class Hasher:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
     Create a JWT access token with the given data.
+    
+    Args:
+        data (dict): Data to include in the token payload
+        expires_delta (Optional[timedelta]): How long the token should be valid for
+    
+    Returns:
+        str: Encoded JWT token
     """
     to_encode = data.copy()
     
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=30)
     
     to_encode.update({"exp": expire})
     secret_key = os.getenv("AUTH_SECRET", "your-super-secret-key-change-in-production")

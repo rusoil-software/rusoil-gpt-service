@@ -1,7 +1,7 @@
 import os
 import json
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from fastapi import Body
@@ -10,6 +10,7 @@ from fastapi import Body
 os.environ['MODE'] = 'test'
 os.environ['AUTH_SECRET'] = 'test-secret-key-change-in-production'
 os.environ['ADMIN_PASSWORD'] = 'test-admin-password'
+os.environ['ADMIN_USERNAME'] = 'admin'
 
 from backend.app.main import app
 
@@ -243,7 +244,7 @@ def test_get_me_expired_token():
     # Create token that expires in 1 second
     token = create_access_token(
         data={"sub": "1", "username": "test"},
-        expires_delta=1
+        expires_delta=timedelta(seconds=1)
     )
     
     # Wait for token to expire
