@@ -4,3 +4,4 @@ pytest
 httpx
 requests
 PyJWT
+prometheus_client
