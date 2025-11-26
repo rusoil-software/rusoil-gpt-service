@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from backend.app.auth.models import User
+from backend.app.auth.security import Hasher
 
 # Global users in memory (in production, use database)
 _users: Dict[int, User] = {}
@@ -46,23 +47,51 @@ def get_user_by_id(user_id: int) -> Optional[User]:
 def get_user_by_username(username: str) -> Optional[User]:
     """
     Retrieve a user by their username (case-insensitive).
+    
+    Args:
+        username (str): Username to look up
+    
+    Returns:
+        Optional[User]: User object if found, None otherwise
     """
+    if not username:
+        return None
+        
     username = username.lower()
     for user in _users.values():
         if user.username.lower() == username:
             return user
     return None
 
-def create_user(username: str, hashed_password: str, is_admin: bool = False) -> User:
+def create_user(username: str, password: str, is_admin: bool = False) -> User:
     """
     Create a new user with the given credentials.
+    
+    Args:
+        username (str): Username for the new user
+        password (str): Password for the new user (will be hashed)
+        is_admin (bool): Whether the user should have admin privileges
+    
+    Returns:
+        User: The created User object
+    
+    Raises:
+        ValueError: If username already exists
     """
     global _next_id
     
+    # Validate input
+    if not username or not password:
+        raise ValueError("Username and password are required")
+        
     # Check if username already exists
     if get_user_by_username(username):
         raise ValueError(f"Username '{username}' already exists")
     
+    # Hash the password
+    hashed_password = Hasher.get_password_hash(password)
+    
+    # Create user with hashed password
     user = User(
         id=_next_id,
         username=username,
@@ -112,10 +141,8 @@ def initialize_admin() -> None:
         print("Warning: ADMIN_PASSWORD not set, admin user will not be created")
         return
     
-    from backend.app.auth.security import get_password_hash
-    
     try:
-        create_user(admin_username, get_password_hash(admin_password), is_admin=True)
+        create_user(admin_username, admin_password, is_admin=True)
         print(f"Admin user '{admin_username}' created successfully")
     except ValueError as e:
         print(f"Warning: Could not create admin user: {e}")

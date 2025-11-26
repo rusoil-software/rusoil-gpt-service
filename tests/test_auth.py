@@ -267,23 +267,52 @@ def test_admin_initialization():
     import os
     from backend.app.auth.users import _users
     
+    # Verify user storage file exists
     assert os.path.exists("backend/app/auth/users.json")
+    
+    # Verify admin user was created
     assert len(_users) > 0
     assert _users[1].username == "admin"
     assert _users[1].is_admin is True
+    
+    # Verify password is hashed (not stored in plaintext)
+    assert _users[1].hashed_password is not None
+    assert _users[1].hashed_password != os.getenv("ADMIN_PASSWORD")
+    assert _users[1].hashed_password.startswith("$2b$") or _users[1].hashed_password.startswith("$2y$")
+    
+    # Verify we can authenticate with admin credentials
+    login_response = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": os.getenv("ADMIN_PASSWORD")},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    assert login_response.status_code == 200
 
 def test_password_hashing():
     """
-    Test that passwords are properly hashed and verified.
+    Test that passwords are properly hashed and verified using bcrypt.
     """
     from backend.app.auth.security import Hasher
     
     password = "test-password"
     hashed = Hasher.get_password_hash(password)
     
-    assert hashed != password  # Password is hashed
-    assert Hasher.verify_password(password, hashed) is True  # Can verify
-    assert Hasher.verify_password("wrong-password", hashed) is False  # Rejects wrong password
+    # Verify hashing security properties
+    assert hashed is not None
+    assert hashed != password  # Password is not stored in plaintext
+    assert len(hashed) > 0  # Hash is generated
+    assert hashed.startswith("$2b$") or hashed.startswith("$2y$")  # bcrypt hash format
+    
+    # Verify password verification
+    assert Hasher.verify_password(password, hashed) is True  # Correct password verifies
+    assert Hasher.verify_password("wrong-password", hashed) is False  # Wrong password rejected
+    assert Hasher.verify_password("", hashed) is False  # Empty password rejected
+    assert Hasher.verify_password(None, hashed) is False  # None password rejected
+    
+    # Test with different password lengths
+    long_password = "a" * 100  # Long password
+    long_hashed = Hasher.get_password_hash(long_password)
+    assert Hasher.verify_password(long_password, long_hashed) is True
 
 def test_jwt_token_creation():
     """
@@ -308,11 +337,9 @@ def test_inactive_user():
     Test that inactive users cannot login.
     """
     from backend.app.auth.users import create_user, get_user_by_username
-    from backend.app.auth.security import get_password_hash
     
     # Create inactive user
-    hashed_password = get_password_hash("test-password")
-    user = create_user("inactive", hashed_password)
+    user = create_user("inactive", "test-password")
     user.is_active = False
     
     # Try to login
@@ -325,24 +352,51 @@ def test_inactive_user():
     assert response.status_code == 401
     data = response.json()
     assert data["detail"] == "Inactive user"
+    
+    # Verify user is stored with correct properties
+    stored_user = get_user_by_username("inactive")
+    assert stored_user is not None
+    assert stored_user.is_active is False
+    assert stored_user.hashed_password is not None
+    assert stored_user.hashed_password.startswith("$2b$") or stored_user.hashed_password.startswith("$2y$")
 
 def test_case_insensitive_username():
     """
     Test that username lookup is case-insensitive.
     """
     from backend.app.auth.users import create_user, get_user_by_username
-    from backend.app.auth.security import get_password_hash
     
     # Create user with mixed case
-    hashed_password = get_password_hash("test-password")
-    create_user("TestUser", hashed_password)
+    create_user("TestUser", "test-password")
     
     # Look up with different cases
     user1 = get_user_by_username("testuser")
     user2 = get_user_by_username("TESTUSER")
     user3 = get_user_by_username("TestUser")
+    user4 = get_user_by_username("")  # Empty username
+    user5 = get_user_by_username(None)  # None username
     
+    # Verify case-insensitive matching
     assert user1 is not None
     assert user2 is not None
     assert user3 is not None
     assert user1.id == user2.id == user3.id
+    
+    # Verify edge cases return None
+    assert user4 is None
+    assert user5 is None
+    
+    # Verify we can login with different cases
+    response1 = client.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "test-password"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    assert response1.status_code == 200
+    
+    response2 = client.post(
+        "/auth/login",
+        data={"username": "TESTUSER", "password": "test-password"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    assert response2.status_code == 200
