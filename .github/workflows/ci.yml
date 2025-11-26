@@ -146,7 +146,8 @@ jobs:
 
       - name: Start backend (uvicorn) for auth smoke
         env:
-          AUTH_SECRET: 'changeme'
+          # Read AUTH_SECRET from repository secrets at runtime. If not set, the app falls back to 'changeme'.
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
         run: |
           nohup uvicorn backend.app.main:app --host 127.0.0.1 --port 8002 > uvicorn-auth.log 2>&1 &
           echo $! > uvicorn-auth.pid
