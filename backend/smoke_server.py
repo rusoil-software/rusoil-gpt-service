@@ -14,10 +14,26 @@ class SmokeHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+<<<<<<< HEAD
         if self.path == '/health':
             self.handle_health()
         elif self.path == '/metrics':
             self.handle_metrics()
+=======
+        if self.path in ("/health", "/ready"):
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            payload = {'status': 'ok', 'path': self.path}
+            self.wfile.write(json.dumps(payload).encode('utf-8'))
+        elif self.path == '/metrics':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+            self.end_headers()
+            # Provide a minimal prometheus text-format metric so CI can query /metrics
+            metrics = '# HELP petra_dummy_metric A dummy metric for smoke tests\n# TYPE petra_dummy_metric gauge\npetra_dummy_metric 1\n'
+            self.wfile.write(metrics.encode('utf-8'))
+>>>>>>> 1307c30509d1223b7528706b02be233238408c29
         else:
             self._set_headers(404)
             self.wfile.write(b"Not Found")
