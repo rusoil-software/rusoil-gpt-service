@@ -53,7 +53,7 @@ jobs:
               const files = [];
 
               while (true) {
-                const res = await github.pulls.listFiles({
+                const res = await github?.pulls?.listFiles?.({
                   owner,
                   repo,
                   pull_number: prNumber,
@@ -86,24 +86,35 @@ jobs:
               core.setOutput('files_json', '[]');
             }
 
-      - name: Debug: print PR body and changed files (non-failing)
+      - name: Print PR body and changed files (non-failing)
         id: debug_print
         uses: actions/github-script@v6
+        env:
+          PR_BODY: ${{ steps.get_pr_data.outputs.pr_body }}
+          FILES_JSON: ${{ steps.get_pr_data.outputs.files_json }}
         with:
           script: |
             // Print PR body and file list for diagnostics (non-failing)
-            const prBody = '${{ steps.get_pr_data.outputs.pr_body }}' || '';
-            const files = JSON.parse('${{ steps.get_pr_data.outputs.files_json }}' || '[]');
+            const body = process.env.PR_BODY || '';
+            let files = [];
+            try {
+              files = JSON.parse(process.env.FILES_JSON || '[]');
+            } catch (e) {
+              core.info('Failed to parse FILES_JSON: ' + String(e));
+              files = [];
+            }
 
             core.info('--- PR BODY START ---');
-            core.info(prBody || '(empty)');
+            core.info(body ? body.slice(0, 8000) : '(empty)');
             core.info('--- PR BODY END ---');
 
-            core.info(`Changed files (${files.length}):`);
-            for (const f of files.slice(0, 500)) {
-              core.info(` - ${f.filename}`);
+            core.info(`Changed files (${Array.isArray(files) ? files.length : 0}):`);
+            if (Array.isArray(files)) {
+              for (const f of files.slice(0, 500)) {
+                core.info(` - ${f.filename}`);
+              }
+              if (files.length > 500) core.info(`... (${files.length - 500} more files omitted from log)`);
             }
-            if (files.length > 500) core.info(`... (${files.length - 500} more files omitted from log)`);
 
       - name: Check PR body and changed files for conventions and tests
         id: check_conventions
@@ -126,19 +137,14 @@ jobs:
             const requiredText = 'I read and followed doc/conventions.md';
             const checkboxRegex = /^\s*[-*]\s*\[\s*[xX]?\s*\]\s*I read and followed doc\/conventions\.md/m;
 
-            // marker files that indicate acknowledgement (case-insensitive match on endsWith)
-            const allowedMarkerFiles = ['CONVENTIONS_ACKNOWLEDGED', 'doc/conventions_acknowledged.md'];
-            const lowerMarkers = allowedMarkerFiles.map(m => m.toLowerCase());
-
             const normalizedFilenames = files.map(f => (f.filename || '').toLowerCase());
 
             const hasRequiredText = body.includes(requiredText) || checkboxRegex.test(body);
-            const hasMarkerFile = normalizedFilenames.some(fn => lowerMarkers.some(m => fn.endsWith(m)));
 
-            if (!hasRequiredText && !hasMarkerFile) {
+            if (!hasRequiredText) {
               core.setFailed(
                 `PR description must include the checklist line: '${requiredText}' (exact text) ` +
-                `or the checkbox variant (e.g. '- [x] ${requiredText}'), or include one of the marker files: ${JSON.stringify(allowedMarkerFiles)}.` 
+                `or the checkbox variant (e.g. '- [x] ${requiredText}').` 
               );
               return;
             }
@@ -186,56 +192,56 @@ jobs:
             const requiredText = 'I read and followed doc/conventions.md';
 
             const body = `${botMarker}
-Thanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:
+            Thanks — the repository's PR conventions check failed. Please follow these steps to fix the PR:
 
-1) Add the exact checklist line to the PR description:
-   - ${requiredText}
+            1) Add the exact checklist line to the PR description:
+              - ${requiredText}
 
-   (You may also use a checkbox: "- [x] ${requiredText}")
+              (You may also use a checkbox: "- [x] ${requiredText}")
 
-2) If you changed code files, add fast unit tests (happy path + 1 edge case).
-   Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.
+            2) If you changed code files, add fast unit tests (happy path + 1 edge case).
+              Put tests under a \`tests/\` folder or use naming like \`*.test.*\` or \`*.spec.*\`.
 
-3) Reference any architectural rationale in \`doc/vision.md\` and link relevant issues.
+            3) Reference any architectural rationale in \`doc/vision.md\` and link relevant issues.
 
-Quick examples (copy-paste):
+            Quick examples (copy-paste):
 
-Python (pytest):
-\`\`\`python
-def test_my_feature_happy_path():
-    assert 1 + 1 == 2
-\`\`\`
+            Python (pytest):
+            \`\`\`python
+            def test_my_feature_happy_path():
+                assert 1 + 1 == 2
+            \`\`\`
 
-Jest + TypeScript:
-\`\`\`ts
-// tests/example.test.ts
-import { describe, test, expect } from '@jest/globals';
+            Jest + TypeScript:
+            \`\`\`ts
+            // tests/example.test.ts
+            import { describe, test, expect } from '@jest/globals';
 
-describe('example suite', () => {
-  test('happy path', () => {
-    expect(1 + 2).toBe(3);
-  });
-});
-\`\`\`
+            describe('example suite', () => {
+              test('happy path', () => {
+                expect(1 + 2).toBe(3);
+              });
+            });
+            \`\`\`
 
-Resources:
-- Conventions: \`doc/conventions.md\`
-- Vision/design rationale: \`doc/vision.md\`
+            Resources:
+            - Conventions: \`doc/conventions.md\`
+            - Vision/design rationale: \`doc/vision.md\`
 
-If you think this check is incorrect, reply here and request a maintainer review.
-`;
+            If you think this check is incorrect, reply here and request a maintainer review.
+            `;
 
             // Find existing comment by bot marker
-            const commentsRes = await github.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const commentsRes = await github?.issues?.listComments?.({ owner, repo, issue_number, per_page: 100 });
             const comments = (commentsRes && commentsRes.data) || [];
 
             const existing = comments.find(c => c && c.body && c.body.startsWith(botMarker) &&
               (c.user && (c.user.type === 'Bot' || c.user.login === 'github-actions[bot]')));
 
             if (existing) {
-              await github.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              await github?.issues?.updateComment?.({ owner, repo, comment_id: existing.id, body });
               core.info('Updated existing bot comment.');
             } else {
-              await github.issues.createComment({ owner, repo, issue_number, body });
+              await github?.issues?.createComment?.({ owner, repo, issue_number, body });
               core.info('Created remediation comment on PR.');
-            }
+              }
