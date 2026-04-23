@@ -1,5 +1,5 @@
 fastapi
-werkzeug==3.1.5
+werkzeug==3.1.6
 uvicorn
 pytest
 httpx
